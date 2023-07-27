@@ -99,7 +99,7 @@ plt.show()
 # ----------------------------------------------------------
 names = sales_df.drop('sales', axis=1).columns
 
-lasso = Lasso(alpha=100)
+lasso = Lasso(alpha=0.3)
 lasso_coeff = lasso.fit(X, y).coef_
 
 fig, ax = plt.subplots()
