@@ -55,10 +55,13 @@ print(confusion_matrix(y_test, y_pred))
 
 # Print the classification report
 print(classification_report(y_test, y_pred))
+# Note that the output shows a better F1 score for the zero class, which represents
+# individuals that do not have diabetes. This is because there are more individuals
 
 # In the report printed above,
-# - The precision is the ratio of the true positives to the sum of true and false positives.
-# - The recall is the ratio of the true positives to the sum of true positives and false negatives.
-# - The F1 score is the harmonic mean of the precision and recall.
+# - The precision is the ratio of the true positives to the sum of true and false positives. (Positive predictive value)
+# - The recall is the ratio of the true positives to the sum of true positives and false negatives. (Sensitivity)
+# - The F1 score is the harmonic mean of the precision and recall. (F1 score)
 
+# The metric that is most important depends on the problem and the business goal.
 
