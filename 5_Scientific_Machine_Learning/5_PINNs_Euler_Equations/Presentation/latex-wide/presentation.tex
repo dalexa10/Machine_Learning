@@ -177,37 +177,47 @@
 %======================================================================
 \begin{frame}\frametitle{Difficulties \& Next steps}
 
-\begin{itemize}
-	\item \textbf{\textcolor{myOrange}{Difficulties}}
+	\begin{itemize}
+		\item \textbf{\textcolor{myOrange}{Difficulties}}
+			
+			\begin{itemize}
+				\item None of the models trained is able to completely capture the physics at the discontinuity (shock)
+				\item Some models are presenting oscillations, while others present dissipation 
+				\item So far, training the models using cpu-only machines requires significant time (for 5000 epoch $\approx$ 15[min])
+			\end{itemize}
+		
+		\vspace{3mm}
+		
+		\item \textbf{\textcolor{myOrange}{Next steps}}
 		
 		\begin{itemize}
-			\item None of the models trained is able to completely capture the physics at the discontinuity (shock)
-			\item Some models are presenting oscillations, while others present dissipation 
-			\item So far, training the models using cpu-only machines requires significant time (for 5000 epoch $\approx$ 15[min])
-		\end{itemize}
-	
-	\vspace{3mm}
-	
-	\item \textbf{\textcolor{myOrange}{Next steps}}
-	
-	\begin{itemize}
-		\item Train the model using any GPU-accelerated device (HAL, local) and compare training times
-		\item Implement a formal comparison with the exact solution and a high-order numerical method (WENO scheme)
-		\item Define a set of neural networks parameters (width, hidden layers, optimizers, mini batches) and train the model with
-		their combination. 
-		\item For the previous goal, a shell script will be created to set the aforesaid parameters and run the jobs automatically
-		in a remote computer		
-		\item Implement either a 2-D compressible flow case or solve the inverse problem for a given set of density gradients (mimicking a Schlieren image)
+			\item Train the model using any GPU-accelerated device (HAL, local) and compare training times
+			\item Implement a formal comparison with the exact solution and a high-order numerical method (WENO scheme)
+			\item Define a set of neural networks parameters (width, hidden layers, optimizers, mini batches) and train the model with
+			their combination. 
+			\item For the previous goal, a shell script will be created to set the aforesaid parameters and run the jobs automatically
+			in a remote computer		
+			\item Implement either a 2-D compressible flow case or solve the inverse problem for a given set of density gradients (mimicking a Schlieren image)
+		\end{itemize}	
+		
 	\end{itemize}
-	
-	
-\end{itemize}
-
-
-
 
 \end{frame}
 %======================================================================
+
+%======================================================================
+\begin{frame}\frametitle{References}
+	
+	\begin{enumerate}
+		\item Mao, Z., Jagtap, A. D., \& Karniadakis, G. E. (2020). Physics-informed neural networks for high-speed flows. Computer Methods in Applied Mechanics and Engineering, 360, 112789
+		\item Papados, A. Solving hydrodynamic shock-tube problems using weighted physics-informed neural networks with domain extension.
+	\end{enumerate}
+	
+\end{frame}
+%======================================================================
+
+
+
 
 
 \end{document}
