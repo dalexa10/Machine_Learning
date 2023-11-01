@@ -22,27 +22,26 @@ class ffnn(nn.Module):
 
         self.last_layer = nn.Linear(nn_width, 3)
 
-
-    def forward(self, x, t):
-        xt = torch.cat([x, t], dim=1)
+    def forward(self, tx):
         activation = nn.Tanh()
-        u = activation(self.first_layer(xt))
+        u = activation(self.first_layer(tx))
         for hidden in self.hidden_layers:
             u = activation(hidden(u))
         u = self.last_layer(u)
         return u
 
 def set_initial_conditions(x):
-    """ Set the the initial conditions for rho, u, and p vectors
+    """ Set the initial conditions for rho, u, and p vectors
     according to the Sod shock tube problem. """
 
-    # Initialize vectors
-    rho_ic = np.zeros((x.shape[0], 1))
-    u_ic = np.zeros((x.shape[0], 1))
-    p_ic = np.zeros((x.shape[0], 1))
+    N = len(x)
+
+    rho_ic = np.zeros((x.shape[0]))  # rho - initial condition
+    u_ic = np.zeros((x.shape[0]))  # u - initial condition
+    p_ic = np.zeros((x.shape[0]))
 
     # Set initial conditions
-    for i in range(x.shape[0]):
+    for i in range(N):
         if x[i] <= 0.5:
             rho_ic[i] = 1.0
             p_ic[i] = 1.0
@@ -52,9 +51,9 @@ def set_initial_conditions(x):
 
     return rho_ic, u_ic, p_ic
 
-def initial_condition_loss_function(model, x, t, rho_ic, u_ic, p_ic):
-    U_pred = model(x, t)
-    rho, u, p = U_pred[:, 0:1], U_pred[:, 1:2], U_pred[:, 2:3]
+def initial_condition_loss_function(model, tx, rho_ic, u_ic, p_ic):
+    U_pred = model(tx)
+    rho, u, p = U_pred[:, 0], U_pred[:, 1], U_pred[:, 2]
 
     # Losses for each state
     rho_loss = torch.mean((rho - rho_ic)**2)
@@ -67,20 +66,20 @@ def initial_condition_loss_function(model, x, t, rho_ic, u_ic, p_ic):
     return ic_loss
 
 
-def pde_loss_function(model, x, t):
-    U_pred = model(x, t)
-    rho, u, p = U_pred[:, 0:1], U_pred[:, 1:2], U_pred[:, 2:3]
+def pde_loss_function(model, tx):
+    U_pred = model(tx)
+    rho, u, p = U_pred[:, 0], U_pred[:, 1], U_pred[:, 2]
     gamma = 1.4
 
     # Compute gradient with respect to time
-    rho_t = torch.autograd.grad(rho, t, grad_outputs=torch.ones_like(rho), create_graph=True)[0]
-    u_t = torch.autograd.grad(u, t, grad_outputs=torch.ones_like(u), create_graph=True)[0]
-    p_t = torch.autograd.grad(p, t, grad_outputs=torch.ones_like(p), create_graph=True)[0]
+    rho_grad = torch.autograd.grad(rho, tx, grad_outputs=torch.ones_like(rho), create_graph=True)[0]
+    rho_t, rho_x = rho_grad[:, 0], rho_grad[:, 1]
 
-    # Compute gradient with respect to space
-    rho_x = torch.autograd.grad(rho, x, grad_outputs=torch.ones_like(rho), create_graph=True)[0]
-    u_x = torch.autograd.grad(u, x, grad_outputs=torch.ones_like(u), create_graph=True)[0]
-    p_x = torch.autograd.grad(p, x, grad_outputs=torch.ones_like(p), create_graph=True)[0]
+    u_grad = torch.autograd.grad(u, tx, grad_outputs=torch.ones_like(u), create_graph=True)[0]
+    u_t, u_x = u_grad[:, 0], u_grad[:, 1]
+
+    p_grad = torch.autograd.grad(p, tx, grad_outputs=torch.ones_like(p), create_graph=True)[0]
+    p_t, p_x = p_grad[:, 0], p_grad[:, 1]
 
     # Losses for each state
     rho_loss = rho_t + u * rho_x + rho * u_x
@@ -115,33 +114,32 @@ if __name__ == '__main__':
 
     x = np.linspace(-1.5, 3.125, nx)
     t = np.linspace(0, 0.2, nt)
-    x_grid, t_grid = np.meshgrid(x, t)
-    X = x_grid.flatten()[:, None]  # Same as reshape
+    t_grid, x_grid = np.meshgrid(t, x)
     T = t_grid.flatten()[:, None]
-
+    X = x_grid.flatten()[:, None]  # Same as reshape
 
     id_ic = np.random.choice(nx, n_i_train, replace=False)  # Random sample numbering for IC
     id_f = np.random.choice(nx * nt, n_f_train, replace=False)  # Random sample numbering for interior
 
+    # Initial conditions
     x_ic = x_grid[id_ic, 0][:, None]
     t_ic = t_grid[id_ic, 0][:, None]
-
     rho_ic, u_ic, p_ic = set_initial_conditions(x_ic)
-    xt_ic_train = np.hstack((x_ic, t_ic))
-
-    x_int = X[id_f, 0][:, None]
-    t_int = T[id_f, 0][:, None]
-    xt_int_test = np.hstack((x_int, t_int))
-    xt_train = np.hstack((X, T))
+    tx_ic = np.hstack((t_ic, x_ic))
 
     # Convert to tensors
-    xt_ic_train = torch.tensor(xt_ic_train, dtype=torch.float32).to(device)
-    xt_int_test = torch.tensor(xt_int_test, requires_grad=True, dtype=torch.float32).to(device)
-    xt_test = torch.tensor(xt_train, requires_grad=True, dtype=torch.float32).to(device)
-
+    tx_ic_train = torch.tensor(tx_ic, dtype=torch.float32).to(device)
     rho_ic_train = torch.tensor(rho_ic, dtype=torch.float32).to(device)
     u_ic_train = torch.tensor(u_ic, dtype=torch.float32).to(device)
     p_ic_train = torch.tensor(p_ic, dtype=torch.float32).to(device)
+
+    # Internal points
+    x_int = X[id_f, 0][:, None]
+    t_int = T[id_f, 0][:, None]
+    tx_int = np.hstack((t_int, x_int))
+
+    # Convert to tensors
+    tx_int_train = torch.tensor(tx_int, requires_grad=True, dtype=torch.float32).to(device)
 
     # Set optimizer
     opt = torch.optim.Adam(model.parameters(), lr=lr)
@@ -149,11 +147,12 @@ if __name__ == '__main__':
     loss_history = []
 
     for i in range(n_epochs):
-        loss_IC = initial_condition_loss_function(model, xt_ic_train[:, 1:2], xt_ic_train[:, 0:1],
-                                                  rho_ic_train, u_ic_train, p_ic_train)
-        loss_PDE = pde_loss_function(model, xt_int_test[:, 1:2], xt_int_test[:, 0:1])
 
+        loss_IC = initial_condition_loss_function(model, tx_ic_train, rho_ic_train, u_ic_train, p_ic_train)
+        loss_PDE = pde_loss_function(model, tx_int_train)
         loss = 10 * loss_IC + 0.1 * loss_PDE
+
+        # loss = loss_IC + loss_PDE
 
         opt.zero_grad()
         loss_history.append(loss.item())
@@ -161,62 +160,63 @@ if __name__ == '__main__':
         opt.step()
 
         if i % 100 == 0:
-            print('Epoch: %d, Loss: %.3e' % (i, loss.item()))
+            print('Epoch: %d, LossIC: %.5f, LossPDE: %.5f, Loss: %5f' % (i, loss_IC.item(), loss_PDE.item(), loss.item()))
 
 #%%
     # Test model
-    with torch.no_grad():
+    with (torch.no_grad()):
         # U_pred = model(xt_test[:, 1:2], xt_test[:, 0:1])
         # rho_pred = U_pred[:, 0:1]
         # u_pred = U_pred[:, 1:2]
         # p_pred = U_pred[:, 2:3]
 
-        U_pred = model(xt_test[:, 1:2], xt_test[:, 0:1])
-        rho_pred = U_pred[:, 0:1].reshape(x_grid.shape).detach().cpu().numpy()
-        u_pred = U_pred[:, 1:2].reshape(x_grid.shape).detach().cpu().numpy()
-        p_pred = U_pred[:, 2:3].reshape(x_grid.shape).detach().cpu().numpy()
+        x_test = x[:, None]
+        t_test = 0.2 * np.ones(x_test.shape)
+        tx_test = np.hstack((t_test, x_test))
+        tx_test = torch.tensor(tx_test, dtype=torch.float32).to(device)
+
+        U_pred = model(tx_test)
+        rho_pred = U_pred[:, 0].detach().cpu().numpy()
+        u_pred = U_pred[:, 1].detach().cpu().numpy()
+        p_pred = U_pred[:, 2].detach().cpu().numpy()
 
 #%%
     # Plot results for a specific time
-    fig, ax = plt.subplots(1, 3, figsize=(15,5))
+    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
 
-    ax[0].plot(x, rho_pred[:, 0])
-    ax[0].plot(x, rho_pred[:, -1])
+    ax[0].plot(x, rho_pred)
 
-    ax[1].plot(x, u_pred[:, 0])
-    ax[1].plot(x, u_pred[:, -1])
+    ax[1].plot(x, u_pred)
 
-    ax[2].plot(x, p_pred[:, 0])
-    ax[2].plot(x, p_pred[:, -1])
-
+    ax[2].plot(x, p_pred)
     plt.tight_layout()
     plt.show()
 
-#%%
-    fig, ax = plt.subplots(3, 1, figsize=(15,5))
-
-    heatmap0 = ax[0].imshow(rho_pred, cmap='Spectral', interpolation='nearest', aspect='auto', extent=[0, 0.2, 0, 1])
-    fig.colorbar(heatmap0, ax=ax[0])
-    ax[0].set_xlabel(r'$t$')
-    ax[0].set_ylabel(r'$x$')
-    ax[0].set_title(r'$\rho (x,t)$')
-
-    heatmap1 = ax[1].imshow(u_pred, cmap='Spectral', interpolation='nearest', aspect='auto', extent=[0, 0.2, 0, 1])
-    fig.colorbar(heatmap1, ax=ax[1])
-    ax[1].set_xlabel(r'$t$')
-    ax[1].set_ylabel(r'$x$')
-    ax[1].set_title(r'$u(x,t)$')
-
-    heatmap2 = ax[2].imshow(p_pred, cmap='Spectral', interpolation='nearest', aspect='auto', extent=[0, 0.2, 0, 1])
-    fig.colorbar(heatmap1, ax=ax[2])
-    ax[2].set_xlabel(r'$t$')
-    ax[2].set_ylabel(r'$x$')
-    ax[2].set_title(r'$p(x,t)$')
-
-
-
-    plt.tight_layout()
-    plt.show()
+# #%%
+#     fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+#
+#     heatmap0 = ax[0].imshow(rho_pred, cmap='Spectral', interpolation='nearest', aspect='auto', extent=[0, 0.2, 0, 1])
+#     fig.colorbar(heatmap0, ax=ax[0])
+#     ax[0].set_xlabel(r'$t$')
+#     ax[0].set_ylabel(r'$x$')
+#     ax[0].set_title(r'$\rho (x,t)$')
+#
+#     heatmap1 = ax[1].imshow(u_pred, cmap='Spectral', interpolation='nearest', aspect='auto', extent=[0, 0.2, 0, 1])
+#     fig.colorbar(heatmap1, ax=ax[1])
+#     ax[1].set_xlabel(r'$t$')
+#     ax[1].set_ylabel(r'$x$')
+#     ax[1].set_title(r'$u(x,t)$')
+#
+#     heatmap2 = ax[2].imshow(p_pred, cmap='Spectral', interpolation='nearest', aspect='auto', extent=[0, 0.2, 0, 1])
+#     fig.colorbar(heatmap1, ax=ax[2])
+#     ax[2].set_xlabel(r'$t$')
+#     ax[2].set_ylabel(r'$x$')
+#     ax[2].set_title(r'$p(x,t)$')
+#
+#
+#
+#     plt.tight_layout()
+#     plt.show()
 
 
 
