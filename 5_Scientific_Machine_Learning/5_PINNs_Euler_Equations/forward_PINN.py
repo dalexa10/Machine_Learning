@@ -2,7 +2,8 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import matplotlib.pyplot as plt
+import os
+import pickle
 import time
 
 class ffnn(nn.Module):
@@ -97,12 +98,27 @@ if __name__ == '__main__':
 
     # Device configuration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    mode = '_w_ext'  # '' --> plain mode, '_w' --> weights, '_ext --> extended domain', '_w_ext --> weights and extended domain
+
+    t_lb, t_ub = 0., 0.2
+    if mode == '':
+        x_lb, x_ub = 0., 1.
+        w_pde, w_ic = 1., 1.
+    elif mode == '_w':
+        x_lb, x_ub = 0., 1.
+        w_pde, w_ic = 0.1, 10
+    elif mode == '_ext':
+        x_lb, x_ub = -1.5, 3.125
+        w_pde, w_ic = 1., 1.
+    elif mode == '_w_ext':
+        x_lb, x_ub = -1.5, 3.125
+        w_pde, w_ic = 0.1, 10
 
     # Create the model
     torch.manual_seed(23447)
     model = ffnn(30, 7).to(device)
     lr = 0.0005
-    n_epochs = 10000
+    n_epochs = 5000
 
     # Sampling points
     nx = 1000
@@ -112,8 +128,9 @@ if __name__ == '__main__':
     n_f_train = 11000
 
 
-    x = np.linspace(-1.5, 3.125, nx)
-    t = np.linspace(0, 0.2, nt)
+    # x = np.linspace(-1.5, 3.125, nx)
+    x = np.linspace(x_lb, x_ub, nx)
+    t = np.linspace(t_lb, t_ub, nt)
     t_grid, x_grid = np.meshgrid(t, x)
     T = t_grid.flatten()[:, None]
     X = x_grid.flatten()[:, None]  # Same as reshape
@@ -150,9 +167,7 @@ if __name__ == '__main__':
 
         loss_IC = initial_condition_loss_function(model, tx_ic_train, rho_ic_train, u_ic_train, p_ic_train)
         loss_PDE = pde_loss_function(model, tx_int_train)
-        loss = 10 * loss_IC + 0.1 * loss_PDE
-
-        # loss = loss_IC + loss_PDE
+        loss = w_ic * loss_IC + w_pde * loss_PDE
 
         opt.zero_grad()
         loss_history.append(loss.item())
@@ -162,83 +177,20 @@ if __name__ == '__main__':
         if i % 100 == 0:
             print('Epoch: %d, LossIC: %.5f, LossPDE: %.5f, Loss: %5f' % (i, loss_IC.item(), loss_PDE.item(), loss.item()))
 
-#%%
-    # Test model
-    with (torch.no_grad()):
-        # U_pred = model(xt_test[:, 1:2], xt_test[:, 0:1])
-        # rho_pred = U_pred[:, 0:1]
-        # u_pred = U_pred[:, 1:2]
-        # p_pred = U_pred[:, 2:3]
+    # Store loss history
+    subfolder_path_true = os.path.join(os.getcwd(), 'loss_history')
+    os.makedirs(subfolder_path_true, exist_ok=True)
 
-        x_test = x[:, None]
-        t_test = 0.2 * np.ones(x_test.shape)
-        tx_test = np.hstack((t_test, x_test))
-        tx_test = torch.tensor(tx_test, dtype=torch.float32).to(device)
+    file_name = 'loss_history' + mode + '.pkl'
 
-        U_pred = model(tx_test)
-        rho_pred = U_pred[:, 0].detach().cpu().numpy()
-        u_pred = U_pred[:, 1].detach().cpu().numpy()
-        p_pred = U_pred[:, 2].detach().cpu().numpy()
+    with open(os.path.join(subfolder_path_true, file_name), 'wb') as f:
+        pickle.dump(loss_history, f)
 
-#%%
-    # Plot results for a specific time
-    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-
-    ax[0].plot(x, rho_pred)
-
-    ax[1].plot(x, u_pred)
-
-    ax[2].plot(x, p_pred)
-    plt.tight_layout()
-    plt.show()
-
-# #%%
-#     fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-#
-#     heatmap0 = ax[0].imshow(rho_pred, cmap='Spectral', interpolation='nearest', aspect='auto', extent=[0, 0.2, 0, 1])
-#     fig.colorbar(heatmap0, ax=ax[0])
-#     ax[0].set_xlabel(r'$t$')
-#     ax[0].set_ylabel(r'$x$')
-#     ax[0].set_title(r'$\rho (x,t)$')
-#
-#     heatmap1 = ax[1].imshow(u_pred, cmap='Spectral', interpolation='nearest', aspect='auto', extent=[0, 0.2, 0, 1])
-#     fig.colorbar(heatmap1, ax=ax[1])
-#     ax[1].set_xlabel(r'$t$')
-#     ax[1].set_ylabel(r'$x$')
-#     ax[1].set_title(r'$u(x,t)$')
-#
-#     heatmap2 = ax[2].imshow(p_pred, cmap='Spectral', interpolation='nearest', aspect='auto', extent=[0, 0.2, 0, 1])
-#     fig.colorbar(heatmap1, ax=ax[2])
-#     ax[2].set_xlabel(r'$t$')
-#     ax[2].set_ylabel(r'$x$')
-#     ax[2].set_title(r'$p(x,t)$')
-#
-#
-#
-#     plt.tight_layout()
-#     plt.show()
+    # Store model state
+    subfolder_path_true = os.path.join(os.getcwd(), 'trained_models')
+    os.makedirs(subfolder_path_true, exist_ok=True)
+    torch.save(model.state_dict(), os.path.join(subfolder_path_true, 'model' + mode + '.pth'))
 
 
 
-
-#%%
-    # # Plot results
-    # fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-    # ax[0].scatter(xt_test[:, 1].cpu().detach().numpy(), rho_pred.cpu().detach().numpy(), label='Prediction')
-    # ax[0].set_xlabel('x')
-    # ax[0].set_ylabel('rho')
-    #
-    # ax[1].scatter(xt_test[:, 1].cpu().detach().numpy(), u_pred.cpu().detach().numpy(), label='Prediction')
-    # ax[1].set_xlabel('x')
-    # ax[1].set_ylabel('u')
-    #
-    # ax[2].scatter(xt_test[:, 1].cpu().detach().numpy(), p_pred.cpu().detach().numpy(), label='Prediction')
-    # ax[2].set_xlabel('x')
-    # ax[2].set_ylabel('p')
-    #
-    # plt.tight_layout()
-    # plt.show()
-
-    # Save the model
-    # torch.save(model.state_dict(), 'model.pth')
 
