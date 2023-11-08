@@ -11,12 +11,12 @@ class ffnn(nn.Module):
     Feed-forward neural network class
     """
 
-    def __init__(self, nn_width, nn_hidden):
+    def __init__(self, nn_width, nn_hidden, activation_type='tanh'):
         super().__init__()
         self.first_layer = nn.Linear(2, nn_width)
+        self.activation = self.set_activation_function(activation_type)
 
         layers = []
-
         for _ in range(nn_hidden):
             layers.append(nn.Linear(nn_width, nn_width))
         self.hidden_layers = nn.ModuleList(layers)
@@ -24,12 +24,24 @@ class ffnn(nn.Module):
         self.last_layer = nn.Linear(nn_width, 3)
 
     def forward(self, tx):
-        activation = nn.Tanh()
-        u = activation(self.first_layer(tx))
+        """ Input tx is a tensor of shape (n, 2) """
+        u = self.activation(self.first_layer(tx))
         for hidden in self.hidden_layers:
-            u = activation(hidden(u))
+            u = self.activation(hidden(u))
         u = self.last_layer(u)
         return u
+
+    def set_activation_function(self, activation_type):
+        """ Set the activation function for the hidden layers """
+        if activation_type == 'tanh':
+            activation = nn.Tanh()
+        elif activation_type == 'relu':
+            activation = nn.ReLU()
+        elif activation_type == 'silu':
+            activation = nn.SiLU()
+        else:
+            raise ValueError('Activation type not recognized')
+        return activation
 
 def set_initial_conditions(x):
     """ Set the initial conditions for rho, u, and p vectors
@@ -37,11 +49,12 @@ def set_initial_conditions(x):
 
     N = len(x)
 
+    # Initialization of vectors
     rho_ic = np.zeros((x.shape[0]))  # rho - initial condition
     u_ic = np.zeros((x.shape[0]))  # u - initial condition
-    p_ic = np.zeros((x.shape[0]))
+    p_ic = np.zeros((x.shape[0]))  # p - initial condition
 
-    # Set initial conditions
+    # Set initial conditions of Sod problem
     for i in range(N):
         if x[i] <= 0.5:
             rho_ic[i] = 1.0
@@ -53,6 +66,16 @@ def set_initial_conditions(x):
     return rho_ic, u_ic, p_ic
 
 def initial_condition_loss_function(model, tx, rho_ic, u_ic, p_ic):
+    """
+    Compute the loss for the initial conditions
+    :param model: fnn instance
+    :param tx:  tensor of shape (n, 2)
+    :param rho_ic: tensor of shape (n, 1)
+    :param u_ic: tensor of shape (n, 1)
+    :param p_ic: tensor of shape (n, 1)
+    :return:
+        ic_loss (tensor): loss for the initial conditions
+    """
     U_pred = model(tx)
     rho, u, p = U_pred[:, 0], U_pred[:, 1], U_pred[:, 2]
 
@@ -66,13 +89,19 @@ def initial_condition_loss_function(model, tx, rho_ic, u_ic, p_ic):
 
     return ic_loss
 
-
 def pde_loss_function(model, tx):
+    """
+    Compute the loss for the PDE
+    :param model: fnn instance
+    :param tx: tensor of shape (n, 2)
+    :return:
+        pde_loss (tensor): loss for the PDE
+    """
     U_pred = model(tx)
     rho, u, p = U_pred[:, 0], U_pred[:, 1], U_pred[:, 2]
     gamma = 1.4
 
-    # Compute gradient with respect to time
+    # Compute gradients with respec to time and space
     rho_grad = torch.autograd.grad(rho, tx, grad_outputs=torch.ones_like(rho), create_graph=True)[0]
     rho_t, rho_x = rho_grad[:, 0], rho_grad[:, 1]
 
@@ -82,7 +111,7 @@ def pde_loss_function(model, tx):
     p_grad = torch.autograd.grad(p, tx, grad_outputs=torch.ones_like(p), create_graph=True)[0]
     p_t, p_x = p_grad[:, 0], p_grad[:, 1]
 
-    # Losses for each state
+    # Residual losses for each state (Enforcing characteristic form of Euler equations)
     rho_loss = rho_t + u * rho_x + rho * u_x
     u_loss = u_t + u * u_x + p_x / rho
     p_loss = p_t + gamma * p * u_x + u * p_x
@@ -92,43 +121,52 @@ def pde_loss_function(model, tx):
 
     return pde_loss
 
+def train_NN_Euler_equations(config_dict):
 
+    # Start timer
+    start_time = time.time()
 
-if __name__ == '__main__':
+    # Unpack config_dict
+    ext_domain = config_dict['ext_domain']
+    weights = config_dict['weights']
+    width = config_dict['width']
+    hidden = config_dict['hidden']
+    n_epochs = config_dict['n_epochs']
+    lr = config_dict['lr']
+    activation = config_dict['activation']
+
+    t_lb, t_ub = 0., 0.2
+
+    # Set domain bounds
+    if ext_domain == 0:
+        x_lb, x_ub = 0., 1.
+        ext_domain_str = ''
+    else:
+        x_lb, x_ub = -1.5, 3.125
+        ext_domain_str = '_ext'
+
+    # Set weights (activated or not)
+    if weights == 0:
+        w_pde, w_ic = 1., 1.
+        weights_str = ''
+    else:
+        w_pde, w_ic = 0.1, 10
+        weights_str = '_w'
 
     # Device configuration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    mode = '_w_ext'  # '' --> plain mode, '_w' --> weights, '_ext --> extended domain', '_w_ext --> weights and extended domain
-
-    t_lb, t_ub = 0., 0.2
-    if mode == '':
-        x_lb, x_ub = 0., 1.
-        w_pde, w_ic = 1., 1.
-    elif mode == '_w':
-        x_lb, x_ub = 0., 1.
-        w_pde, w_ic = 0.1, 10
-    elif mode == '_ext':
-        x_lb, x_ub = -1.5, 3.125
-        w_pde, w_ic = 1., 1.
-    elif mode == '_w_ext':
-        x_lb, x_ub = -1.5, 3.125
-        w_pde, w_ic = 0.1, 10
 
     # Create the model
     torch.manual_seed(23447)
-    model = ffnn(30, 7).to(device)
-    lr = 0.0005
-    n_epochs = 5000
+    model = ffnn(nn_width=width, nn_hidden=hidden, ).to(device)
 
     # Sampling points
     nx = 1000
     nt = 1000
-    n_IC = 1000
     n_i_train = 1000
     n_f_train = 11000
 
-
-    # x = np.linspace(-1.5, 3.125, nx)
+    # Set the vectors
     x = np.linspace(x_lb, x_ub, nx)
     t = np.linspace(t_lb, t_ub, nt)
     t_grid, x_grid = np.meshgrid(t, x)
@@ -138,7 +176,7 @@ if __name__ == '__main__':
     id_ic = np.random.choice(nx, n_i_train, replace=False)  # Random sample numbering for IC
     id_f = np.random.choice(nx * nt, n_f_train, replace=False)  # Random sample numbering for interior
 
-    # Initial conditions
+    # Initial condition points
     x_ic = x_grid[id_ic, 0][:, None]
     t_ic = t_grid[id_ic, 0][:, None]
     rho_ic, u_ic, p_ic = set_initial_conditions(x_ic)
@@ -160,7 +198,6 @@ if __name__ == '__main__':
 
     # Set optimizer
     opt = torch.optim.Adam(model.parameters(), lr=lr)
-
     loss_history = []
 
     for i in range(n_epochs):
@@ -177,19 +214,71 @@ if __name__ == '__main__':
         if i % 100 == 0:
             print('Epoch: %d, LossIC: %.5f, LossPDE: %.5f, Loss: %5f' % (i, loss_IC.item(), loss_PDE.item(), loss.item()))
 
+    # Create subfolder with results
+    subfolder_name = ('output' + ext_domain_str + weights_str + '_nn_' + str(width) + '_' + str(hidden)
+                      + '_' + activation + '_lr_' + str(lr) + '_epochs_' + str(n_epochs))
+    subfolder_path = os.path.join(os.getcwd(), 'results', subfolder_name)
+    os.makedirs(subfolder_path, exist_ok=True)
+
     # Store loss history
-    subfolder_path_true = os.path.join(os.getcwd(), 'loss_history')
-    os.makedirs(subfolder_path_true, exist_ok=True)
+    file_name_loss_hist = 'loss_history.pkl'
 
-    file_name = 'loss_history' + mode + '.pkl'
-
-    with open(os.path.join(subfolder_path_true, file_name), 'wb') as f:
+    with open(os.path.join(subfolder_path, file_name_loss_hist), 'wb') as f:
         pickle.dump(loss_history, f)
 
     # Store model state
-    subfolder_path_true = os.path.join(os.getcwd(), 'trained_models')
-    os.makedirs(subfolder_path_true, exist_ok=True)
-    torch.save(model.state_dict(), os.path.join(subfolder_path_true, 'model' + mode + '.pth'))
+    torch.save(model.state_dict(), os.path.join(subfolder_path, 'model.pth'))
+
+    # End time
+    end_time = time.time()
+
+    # Print elapsed time and model information
+
+    print('-----------------------------------------')
+    print('Model outcomes information:')
+    print('-----------------------------------------')
+    print('device: {}'.format(device))
+    print('Elapsed time: {:.3f} seconds'.format(end_time - start_time))
+
+    return None
+
+
+if __name__ == '__main__':
+    import multiprocessing
+
+    cases_dict = {0: {'ext_domain': 0,
+                      'weights': 0,
+                      'width': 30,
+                      'hidden': 7,
+                      'n_epochs': 20000,
+                      'lr': 0.0005,
+                      'activation': 'tanh'},
+                  1: {'ext_domain': 1,
+                      'weights': 0,
+                      'width': 30,
+                      'hidden': 7,
+                      'n_epochs': 20000,
+                      'lr': 0.0005,
+                      'activation': 'tanh'},
+                  2: {'ext_domain': 0,
+                      'weights': 1,
+                      'width': 30,
+                      'hidden': 7,
+                      'n_epochs': 20000,
+                      'lr': 0.0005,
+                      'activation': 'tanh'},
+                  3: {'ext_domain': 1,
+                      'weights': 1,
+                      'width': 30,
+                      'hidden': 7,
+                      'n_epochs': 20000,
+                      'lr': 0.0005,
+                      'activation': 'tanh'}}
+
+    # Parallelize the training
+    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+        pool.map(train_NN_Euler_equations, cases_dict.values())
+
 
 
 
