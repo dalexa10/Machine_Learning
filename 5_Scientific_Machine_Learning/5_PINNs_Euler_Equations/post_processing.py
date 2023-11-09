@@ -17,7 +17,7 @@ models_dict = {}
 for i, subfolder in enumerate(subfolders):
     try:
         # Load model data
-        with open(os.path.join(subfolder, 'model_data_dict.pkl'), 'rb') as f:
+        with open(os.path.join(subfolder, 'data_dict.pkl'), 'rb') as f:
             model_data_dict = pickle.load(f)
 
         # Load history training
@@ -119,7 +119,7 @@ with torch.no_grad():
 #%%
 fig, ax = plt.subplots(2,2 , figsize=(10, 8))
 for k in models_dict.keys():
-    ax[0, 0].plot(models_dict['loss_history'], label=models_dict['model_data_dict']['case_name'])
+    ax[0, 0].plot(models_dict[k]['loss_history'], label=models_dict[k]['model_data_dict']['case_name'])
 ax[0, 0].set_xlabel('Epochs')
 ax[0, 0].set_yscale('log')
 ax[0, 0].set_ylabel('Loss')
