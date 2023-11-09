@@ -158,7 +158,7 @@ def train_NN_Euler_equations(config_dict):
 
     # Create the model
     torch.manual_seed(23447)
-    model = ffnn(nn_width=width, nn_hidden=hidden, ).to(device)
+    model = ffnn(nn_width=width, nn_hidden=hidden, activation_type=activation).to(device)
 
     # Sampling points
     nx = 1000
@@ -232,8 +232,22 @@ def train_NN_Euler_equations(config_dict):
     # End time
     end_time = time.time()
 
-    # Print elapsed time and model information
+    model_data_dict = {'case_name': subfolder_name,
+                       'loss_history': loss_history,
+                       'lr': lr,
+                       'n_epochs': n_epochs,
+                       'activation': activation,
+                       'width': width,
+                       'hidden': hidden,
+                       'ext_domain': ext_domain,
+                       'weights': weights,
+                       'device': device,
+                       'time': end_time - start_time}
 
+    with open(os.path.join(subfolder_path, 'data_dict.pkl'), 'wb') as f:
+        pickle.dump(model_data_dict, f)
+
+    # Print elapsed time and model information
     print('-----------------------------------------')
     print('Model outcomes information:')
     print('-----------------------------------------')
