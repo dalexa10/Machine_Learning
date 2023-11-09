@@ -7,6 +7,39 @@ import matplotlib.pyplot as plt
 import forward_PINN
 from analytic_solutions import SodShockAnalytic
 
+
+def generate_plot(data_dict):
+    fig, ax = plt.subplots(2, 2, figsize=(10, 8))
+    for k in data_dict.keys():
+        ax[0, 0].plot(data_dict[k]['loss_history'], label=data_dict[k]['model_data_dict']['case_name'])
+    ax[0, 0].set_xlabel('Epochs')
+    ax[0, 0].set_yscale('log')
+    ax[0, 0].set_ylabel('Loss')
+    ax[0, 0].legend()
+
+    ax[0, 1].plot(x_exact, rho_exact, 'k--', label='Analytic')
+    for k in data_dict.keys():
+        ax[0, 1].plot(x_test.numpy(), data_dict[k]['rho_pred'], label=data_dict[k]['model_data_dict']['case_name'])
+    ax[0, 1].set_xlabel(r'$x$')
+    ax[0, 1].set_ylabel(r'$\rho$')
+    ax[0, 1].legend()
+
+    ax[1, 0].plot(x_exact, u_exact, 'k--', label='Analytic')
+    for k in data_dict.keys():
+        ax[1, 0].plot(x_test.numpy(), data_dict[k]['u_pred'], label=data_dict[k]['model_data_dict']['case_name'])
+    ax[1, 0].set_xlabel(r'$x$')
+    ax[1, 0].set_ylabel(r'$u$')
+    ax[1, 0].legend()
+
+    ax[1, 1].plot(x_exact, p_exact, 'k--', label='Analytic')
+    for k in data_dict.keys():
+        ax[1, 1].plot(x_test.numpy(), data_dict[k]['p_pred'], label=data_dict[k]['model_data_dict']['case_name'])
+    ax[1, 1].set_xlabel(r'$x$')
+    ax[1, 1].set_ylabel(r'$p$')
+    ax[1, 1].legend()
+
+    return fig, ax
+
 # Import outcomes from training
 
 results_folder = 'results/'
@@ -37,7 +70,6 @@ for i, subfolder in enumerate(subfolders):
         print('FileNotFoundError')
         continue
 
-
 # Compute analytic solutions
 x_exact = np.linspace(0, 1, 100)
 t_exact = 0.2
@@ -66,38 +98,34 @@ with torch.no_grad():
         models_dict[k]['u_pred'] = u_pred
         models_dict[k]['p_pred'] = p_pred
 
+# Compare NN architecture
+nn_dict = {}
+for k, v in models_dict.items():
+    if (models_dict[k]['activation'] == 'tanh' and models_dict[k]['ext_domain'] == 0 
+            and models_dict[k]['weights'] == 0):
+        nn_dict[k] = v
 
-#%%
-fig, ax = plt.subplots(2,2 , figsize=(10, 8))
-for k in models_dict.keys():
-    ax[0, 0].plot(models_dict[k]['loss_history'], label=models_dict[k]['model_data_dict']['case_name'])
-ax[0, 0].set_xlabel('Epochs')
-ax[0, 0].set_yscale('log')
-ax[0, 0].set_ylabel('Loss')
-ax[0, 0].legend()
+fig, ax = generate_plot(nn_dict)
+plt.tight_layout()
+plt.show()
 
-ax[0, 1].plot(x_exact, rho_exact, 'k--', label='Analytic')
-for k in models_dict.keys():
-    ax[0, 1].plot(x_test.numpy(), models_dict[k]['rho_pred'], label=models_dict[k]['model_data_dict']['case_name'])
-ax[0, 1].set_xlabel(r'$x$')
-ax[0, 1].set_ylabel(r'$\rho$')
-ax[0, 1].legend()
+# Compare activation functions
+act_dict = {}
+for k, v in models_dict.items():
+    if (models_dict[k]['hidden'] == 7 and models_dict[k]['width'] == 30
+            and models_dict[k]['ext_domain'] == 0 and models_dict[k]['weights'] == 0):
+        act_dict[k] = v
+fig, ax = generate_plot(act_dict)
+plt.tight_layout()
+plt.show()
 
-ax[1, 0].plot(x_exact, u_exact, 'k--', label='Analytic')
-for k in models_dict.keys():
-    ax[1, 0].plot(x_test.numpy(), models_dict[k]['u_pred'], label=models_dict[k]['model_data_dict']['case_name'])
-ax[1, 0].set_xlabel(r'$x$')
-ax[1, 0].set_ylabel(r'$u$')
-ax[1, 0].legend()
-
-ax[1, 1].plot(x_exact, p_exact, 'k--', label='Analytic')
-for k in models_dict.keys():
-    ax[1, 1].plot(x_test.numpy(), models_dict[k]['p_pred'], label=models_dict[k]['model_data_dict']['case_name'])
-ax[1, 1].set_xlabel(r'$x$')
-ax[1, 1].set_ylabel(r'$p$')
-ax[1, 1].legend()
-
-
+# Compare weights and extension domain
+w_ext_dict = {}
+for k, v in models_dict.items():
+    if (models_dict[k]['hidden'] == 7 and models_dict[k]['width'] == 30
+            and models_dict[k]['activation'] == 'tanh'):
+        w_ext_dict[k] = v
+fig, ax = generate_plot(w_ext_dict)
 plt.tight_layout()
 plt.show()
 
