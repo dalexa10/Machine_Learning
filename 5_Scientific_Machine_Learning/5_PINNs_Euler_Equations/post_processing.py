@@ -101,8 +101,9 @@ with torch.no_grad():
 # Compare NN architecture
 nn_dict = {}
 for k, v in models_dict.items():
-    if (models_dict[k]['activation'] == 'tanh' and models_dict[k]['ext_domain'] == 0 
-            and models_dict[k]['weights'] == 0):
+    if (models_dict[k]['model_data_dict']['activation'] == 'tanh'
+            and models_dict[k]['model_data_dict']['ext_domain'] == 0
+            and models_dict[k]['model_data_dict']['weights'] == 0):
         nn_dict[k] = v
 
 fig, ax = generate_plot(nn_dict)
@@ -112,8 +113,10 @@ plt.show()
 # Compare activation functions
 act_dict = {}
 for k, v in models_dict.items():
-    if (models_dict[k]['hidden'] == 7 and models_dict[k]['width'] == 30
-            and models_dict[k]['ext_domain'] == 0 and models_dict[k]['weights'] == 0):
+    if (models_dict[k]['model_data_dict']['hidden'] == 7
+            and models_dict[k]['model_data_dict']['width'] == 30
+            and models_dict[k]['model_data_dict']['ext_domain'] == 0
+            and models_dict[k]['model_data_dict']['weights'] == 0):
         act_dict[k] = v
 fig, ax = generate_plot(act_dict)
 plt.tight_layout()
@@ -122,8 +125,9 @@ plt.show()
 # Compare weights and extension domain
 w_ext_dict = {}
 for k, v in models_dict.items():
-    if (models_dict[k]['hidden'] == 7 and models_dict[k]['width'] == 30
-            and models_dict[k]['activation'] == 'tanh'):
+    if (models_dict[k]['model_data_dict']['hidden'] == 7
+            and models_dict[k]['model_data_dict']['width'] == 30
+            and models_dict[k]['model_data_dict']['activation'] == 'tanh'):
         w_ext_dict[k] = v
 fig, ax = generate_plot(w_ext_dict)
 plt.tight_layout()
