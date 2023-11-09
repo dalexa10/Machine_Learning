@@ -38,31 +38,6 @@ for i, subfolder in enumerate(subfolders):
         continue
 
 
-
-# files = ['loss_history.pkl', 'loss_history_w.pkl', 'loss_history_ext.pkl', 'loss_history_w_ext.pkl']
-# for file in files:
-#     with open(os.path.join(loss_folder, file), 'rb') as f:
-#         loaded_file = pickle.load(f)
-#         variable_name = file.split('.')[0]
-#         exec(variable_name + ' = loaded_file')
-#
-# # Load models
-# model = forward_PINN.ffnn(30, 7)
-# model.load_state_dict(torch.load('trained_models/model.pth'))
-# model.eval()
-#
-# model_w = forward_PINN.ffnn(30, 7)
-# model_w.load_state_dict(torch.load('trained_models/model_w.pth'))
-# model_w.eval()
-#
-# model_ext = forward_PINN.ffnn(30, 7)
-# model_ext.load_state_dict(torch.load('trained_models/model_ext.pth'))
-# model_ext.eval()
-#
-# model_w_ext = forward_PINN.ffnn(30, 7)
-# model_w_ext.load_state_dict(torch.load('trained_models/model_w_ext.pth'))
-# model_w_ext.eval()
-
 # Compute analytic solutions
 x_exact = np.linspace(0, 1, 100)
 t_exact = 0.2
@@ -91,30 +66,6 @@ with torch.no_grad():
         models_dict[k]['u_pred'] = u_pred
         models_dict[k]['p_pred'] = p_pred
 
-
-    # # Compute predictions for plain model
-    # U_pred = model(tx_test)
-    # rho_pred = U_pred[:, 0].detach().cpu().numpy()
-    # u_pred = U_pred[:, 1].detach().cpu().numpy()
-    # p_pred = U_pred[:, 2].detach().cpu().numpy()
-    #
-    # # Compute prediction for weighted model
-    # U_pred_w = model_w(tx_test)
-    # rho_pred_w = U_pred_w[:, 0].detach().cpu().numpy()
-    # u_pred_w = U_pred_w[:, 1].detach().cpu().numpy()
-    # p_pred_w = U_pred_w[:, 2].detach().cpu().numpy()
-    #
-    # # Compute prediction for extended model
-    # U_pred_ext = model_ext(tx_test)
-    # rho_pred_ext = U_pred_ext[:, 0].detach().cpu().numpy()
-    # u_pred_ext = U_pred_ext[:, 1].detach().cpu().numpy()
-    # p_pred_ext = U_pred_ext[:, 2].detach().cpu().numpy()
-    #
-    # # Compute prediction for weighted and extended model
-    # U_pred_w_ext = model_w_ext(tx_test)
-    # rho_pred_w_ext = U_pred_w_ext[:, 0].detach().cpu().numpy()
-    # u_pred_w_ext = U_pred_w_ext[:, 1].detach().cpu().numpy()
-    # p_pred_w_ext = U_pred_w_ext[:, 2].detach().cpu().numpy()
 
 #%%
 fig, ax = plt.subplots(2,2 , figsize=(10, 8))
