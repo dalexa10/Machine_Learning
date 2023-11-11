@@ -5,8 +5,8 @@ from forward_PINN import train_NN_Euler_equations
 # Parameters to be tested in the PINN
 ext_domain = [0, 1]
 weights = [0, 1]
-width = [20, 30]
-hidden = [7, 9]
+width = [30]
+hidden = [9]
 activation = ['tanh', 'silu']  # relu
 lr = [0.0005]
 
