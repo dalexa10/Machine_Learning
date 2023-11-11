@@ -18,15 +18,15 @@ def SodShockAnalytic(rL, uL, pL, rR, uR, pR, xs, x0, T, gg):
     # x0: THIS IS AN INDEX! the array index where the interface sits.
     # T: the desired solution time
     # gg: adiabatic constant 1.4=7/5 for a 3D diatomic gas
-    dx = xs[1];
+    dx = xs[1]
     Nx = len(xs)
     v_analytic = np.zeros((3, Nx), dtype='float64')
 
     # compute speed of sound
-    cL = np.sqrt(gg * pL / rL);
-    cR = np.sqrt(gg * pR / rR);
+    cL = np.sqrt(gg * pL / rL)
+    cR = np.sqrt(gg * pR / rR)
     # compute P
-    P = newton(f, 0.5, args=(pL, pR, cL, cR, gg), tol=1e-12);
+    P = newton(f, 0.5, args=(pL, pR, cL, cR, gg), tol=1e-12)
 
     # compute region positions right to left
     # region R
@@ -45,21 +45,21 @@ def SodShockAnalytic(rL, uL, pL, rR, uR, pR, xs, x0, T, gg):
     v_analytic[2, x_contact:x_shock - 1] = P * pR
 
     # region 3
-    r3 = rL * (P * pR / pL) ** (1 / gg);
-    p3 = P * pR;
+    r3 = rL * (P * pR / pL) ** (1 / gg)
+    p3 = P * pR
     c_fanright = c_contact - np.sqrt(gg * p3 / r3)
     x_fanright = x0 + int(np.ceil(c_fanright * T / dx))
-    v_analytic[0, x_fanright:x_contact] = r3;
-    v_analytic[1, x_fanright:x_contact] = c_contact;
-    v_analytic[2, x_fanright:x_contact] = P * pR;
+    v_analytic[0, x_fanright:x_contact] = r3
+    v_analytic[1, x_fanright:x_contact] = c_contact
+    v_analytic[2, x_fanright:x_contact] = P * pR
 
     # region 4
     c_fanleft = -cL
     x_fanleft = x0 + int(np.ceil(c_fanleft * T / dx))
     u4 = 2 / (gg + 1) * (cL + (xs[x_fanleft:x_fanright] - xs[x0]) / T)
-    v_analytic[0, x_fanleft:x_fanright] = rL * (1 - (gg - 1) / 2. * u4 / cL) ** (2 / (gg - 1));
-    v_analytic[1, x_fanleft:x_fanright] = u4;
-    v_analytic[2, x_fanleft:x_fanright] = pL * (1 - (gg - 1) / 2. * u4 / cL) ** (2 * gg / (gg - 1));
+    v_analytic[0, x_fanleft:x_fanright] = rL * (1 - (gg - 1) / 2. * u4 / cL) ** (2 / (gg - 1))
+    v_analytic[1, x_fanleft:x_fanright] = u4
+    v_analytic[2, x_fanleft:x_fanright] = pL * (1 - (gg - 1) / 2. * u4 / cL) ** (2 * gg / (gg - 1))
 
     # region L
     v_analytic[0, :x_fanleft] = rL
