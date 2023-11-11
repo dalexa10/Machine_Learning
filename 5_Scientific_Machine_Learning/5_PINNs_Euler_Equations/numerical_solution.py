@@ -448,10 +448,9 @@ if __name__ == '__main__':
 
     import matplotlib
     import matplotlib.pyplot as plt
-    from itertools import cycle
     from matplotlib import animation
 
-    matplotlib.rcParams['animation.embed_limit'] = 2**28
+
 
     # ----------------------------------------------
     #                  Inputs
