@@ -127,7 +127,7 @@ if __name__ == '__main__':
 
     # Import outcomes from training
 
-    results_folder = 'results/'
+    results_folder = 'neural_network_soutions/training_results/'
     subfolders = [f.path for f in os.scandir(results_folder) if f.is_dir()]
 
     models_dict = {}

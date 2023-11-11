@@ -214,10 +214,10 @@ def train_NN_Euler_equations(config_dict):
         if i % 100 == 0:
             print('Epoch: %d, LossIC: %.5f, LossPDE: %.5f, Loss: %5f' % (i, loss_IC.item(), loss_PDE.item(), loss.item()))
 
-    # Create subfolder with results
+    # Create subfolder with training_results
     subfolder_name = ('output' + ext_domain_str + weights_str + '_nn_' + str(width) + '_' + str(hidden)
                       + '_' + activation + '_lr_' + str(lr) + '_epochs_' + str(n_epochs))
-    subfolder_path = os.path.join(os.getcwd(), 'results', subfolder_name)
+    subfolder_path = os.path.join(os.getcwd(), 'training_results', subfolder_name)
     os.makedirs(subfolder_path, exist_ok=True)
 
     # Store loss history
