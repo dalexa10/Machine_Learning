@@ -164,7 +164,7 @@ def train_NN_Euler_equations(config_dict):
     nx = 1000
     nt = 1000
     n_i_train = 1000
-    n_f_train = 11000
+    n_f_train = 15000
 
     # Set the vectors
     x = np.linspace(x_lb, x_ub, nx)
@@ -252,47 +252,62 @@ def train_NN_Euler_equations(config_dict):
     print('Model outcomes information:')
     print('-----------------------------------------')
     print('device: {}'.format(device))
-    print('Elapsed time: {:.3f} seconds'.format(end_time - start_time))
+    print('Total trainning time: {:.3f} seconds'.format(end_time - start_time))
 
     return None
 
 
 if __name__ == '__main__':
-    import multiprocessing
 
-    cases_dict = {0: {'ext_domain': 0,
-                      'weights': 0,
-                      'width': 30,
-                      'hidden': 7,
-                      'n_epochs': 20000,
-                      'lr': 0.0005,
-                      'activation': 'tanh'},
-                  1: {'ext_domain': 1,
-                      'weights': 0,
-                      'width': 30,
-                      'hidden': 7,
-                      'n_epochs': 20000,
-                      'lr': 0.0005,
-                      'activation': 'tanh'},
-                  2: {'ext_domain': 0,
-                      'weights': 1,
-                      'width': 30,
-                      'hidden': 7,
-                      'n_epochs': 20000,
-                      'lr': 0.0005,
-                      'activation': 'tanh'},
-                  3: {'ext_domain': 1,
-                      'weights': 1,
-                      'width': 30,
-                      'hidden': 7,
-                      'n_epochs': 20000,
-                      'lr': 0.0005,
-                      'activation': 'tanh'}}
+    # --------------------------------------------------------
+    #               Multiprocessing trainning
+    # --------------------------------------------------------
 
-    # Parallelize the training
-    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-        pool.map(train_NN_Euler_equations, cases_dict.values())
+    # import multiprocessing
+    #
+    # cases_dict = {0: {'ext_domain': 0,
+    #                   'weights': 0,
+    #                   'width': 30,
+    #                   'hidden': 7,
+    #                   'n_epochs': 20000,
+    #                   'lr': 0.0005,
+    #                   'activation': 'tanh'},
+    #               1: {'ext_domain': 1,
+    #                   'weights': 0,
+    #                   'width': 30,
+    #                   'hidden': 7,
+    #                   'n_epochs': 20000,
+    #                   'lr': 0.0005,
+    #                   'activation': 'tanh'},
+    #               2: {'ext_domain': 0,
+    #                   'weights': 1,
+    #                   'width': 30,
+    #                   'hidden': 7,
+    #                   'n_epochs': 20000,
+    #                   'lr': 0.0005,
+    #                   'activation': 'tanh'},
+    #               3: {'ext_domain': 1,
+    #                   'weights': 1,
+    #                   'width': 30,
+    #                   'hidden': 7,
+    #                   'n_epochs': 20000,
+    #                   'lr': 0.0005,
+    #                   'activation': 'tanh'}}
+    #
+    # # Parallelize the training
+    # with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+    #     pool.map(train_NN_Euler_equations, cases_dict.values())
 
+    # --------------------------------------------------------
+    #                Single case running
+    # --------------------------------------------------------
+    case_dict = {'ext_domain': 1,
+                    'weights': 1,
+                    'width': 30,
+                    'hidden': 7,
+                    'n_epochs': 50000,
+                    'lr': 0.0005,
+                    'activation': 'tanh'}
 
 
 
