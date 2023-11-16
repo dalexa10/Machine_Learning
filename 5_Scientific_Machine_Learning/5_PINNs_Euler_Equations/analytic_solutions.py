@@ -1,99 +1,131 @@
-# Libraries
 import numpy as np
 from scipy.optimize import newton
 import matplotlib.pyplot as plt
 
+def set_boundary_conditions_Sod_problem(nx):
+    """
+    Set the boundary conditions for the Sod shock tube problem
+    :param nx: (float) number of points in the discretization
+    :return:
+        U_l (list): left state vector [density, velocity, pressure]
+        U_r (list): right state vector [density, velocity, pressure]
+        x0 (int): initial position of the discontinuity (default middle point)
+    """
+    
+    U_l = [1.0, 0.0, 1]     # Left state
+    U_r = [0.125, 0.0, .1]  # Right state
+    x0 = nx // 2            # Initial position of discontinuity
+    
+    return U_l, U_r, x0
+    
+    
+def f(P, pL, pR, cL, cR, gam):
+    """ 
+    Residual function to be solved with Newton's method
+    """
 
-# Function to find the roots of!
-def f(P, pL, pR, cL, cR, gg):
-    a = (gg - 1) * (cR / cL) * (P - 1)
-    b = np.sqrt(2 * gg * (2 * gg + (gg + 1) * (P - 1)))
-    return P - pL / pR * (1 - a / b) ** (2. * gg / (gg - 1.))
+    a = (gam - 1) * (cR / cL) * (P - 1)
+    b = np.sqrt(2 * gam * (2 * gam + (gam + 1) * (P - 1)))
+
+    return P - pL / pR * (1 - a / b) ** (2. * gam / (gam - 1.))
 
 
-# Analtyic Sol to Sod Shock
-def SodShockAnalytic(rL, uL, pL, rR, uR, pR, xs, x0, T, gg):
-    # rL, uL, pL, rR, uR, pR : Initial conditions of the Reimann problem 
-    # xs: position array (e.g. xs = [0,dx,2*dx,...,(Nx-1)*dx])
-    # x0: THIS IS AN INDEX! the array index where the interface sits.
-    # T: the desired solution time
-    # gg: adiabatic constant 1.4=7/5 for a 3D diatomic gas
-    dx = xs[1]
-    Nx = len(xs)
-    v_analytic = np.zeros((3, Nx), dtype='float64')
+def SodShockAnalytic(x, T, gam=7/5):
+    """
+    Analytic solution to the Sod shock tube problem
+    :param x: (np.array) space discretization
+    :param T: (float) final time for numerical simulation
+    :param gam: (float) adiabatic constant 1.4=7/5 for a 3D diatomic gas 
+    :return: 
+        U_analytic (np.array): analytic solution to the Sod shock tube problem
+                    np.array([[rho], [u], [p]])
+    """
+    # Preprocessing 
+    nx = len(x)
+    dx = x[1] - x[0]
+    
+    # Set boundary conditions
+    U_l, U_r, x0 = set_boundary_conditions_Sod_problem(nx)
+    rho_l, u_l, p_l = U_l
+    rho_r, u_r, p_r = U_r
+
+    U_analytic = np.zeros((3, nx), dtype='float64')
 
     # compute speed of sound
-    cL = np.sqrt(gg * pL / rL)
-    cR = np.sqrt(gg * pR / rR)
+    cL = np.sqrt(gam * p_l / rho_l)
+    cR = np.sqrt(gam * p_r / rho_r)
     # compute P
-    P = newton(f, 0.5, args=(pL, pR, cL, cR, gg), tol=1e-12)
+    P = newton(f, 0.5, args=(p_l, p_r, cL, cR, gam), tol=1e-12)
 
     # compute region positions right to left
     # region R
-    c_shock = uR + cR * np.sqrt((gg - 1 + P * (gg + 1)) / (2 * gg))
+    c_shock = u_r + cR * np.sqrt((gam - 1 + P * (gam + 1)) / (2 * gam))
     x_shock = x0 + int(np.floor(c_shock * T / dx))
-    v_analytic[0, x_shock - 1:] = rR
-    v_analytic[1, x_shock - 1:] = uR
-    v_analytic[2, x_shock - 1:] = pR
+    U_analytic[0, x_shock - 1:] = rho_r
+    U_analytic[1, x_shock - 1:] = u_r
+    U_analytic[2, x_shock - 1:] = p_r
 
     # region 2
-    alpha = (gg + 1) / (gg - 1)
-    c_contact = uL + 2 * cL / (gg - 1) * (1 - (P * pR / pL) ** ((gg - 1.) / 2 / gg))
+    alpha = (gam + 1) / (gam - 1)
+    c_contact = u_l + 2 * cL / (gam - 1) * (1 - (P * p_r / p_l) ** ((gam - 1.) / 2 / gam))
     x_contact = x0 + int(np.floor(c_contact * T / dx))
-    v_analytic[0, x_contact:x_shock - 1] = (1 + alpha * P) / (alpha + P) * rR
-    v_analytic[1, x_contact:x_shock - 1] = c_contact
-    v_analytic[2, x_contact:x_shock - 1] = P * pR
+    U_analytic[0, x_contact:x_shock - 1] = (1 + alpha * P) / (alpha + P) * rho_r
+    U_analytic[1, x_contact:x_shock - 1] = c_contact
+    U_analytic[2, x_contact:x_shock - 1] = P * p_r
 
     # region 3
-    r3 = rL * (P * pR / pL) ** (1 / gg)
-    p3 = P * pR
-    c_fanright = c_contact - np.sqrt(gg * p3 / r3)
+    r3 = rho_l * (P * p_r / p_l) ** (1 / gam)
+    p3 = P * p_r
+    c_fanright = c_contact - np.sqrt(gam * p3 / r3)
     x_fanright = x0 + int(np.ceil(c_fanright * T / dx))
-    v_analytic[0, x_fanright:x_contact] = r3
-    v_analytic[1, x_fanright:x_contact] = c_contact
-    v_analytic[2, x_fanright:x_contact] = P * pR
+    U_analytic[0, x_fanright:x_contact] = r3
+    U_analytic[1, x_fanright:x_contact] = c_contact
+    U_analytic[2, x_fanright:x_contact] = P * p_r
 
     # region 4
     c_fanleft = -cL
     x_fanleft = x0 + int(np.ceil(c_fanleft * T / dx))
-    u4 = 2 / (gg + 1) * (cL + (xs[x_fanleft:x_fanright] - xs[x0]) / T)
-    v_analytic[0, x_fanleft:x_fanright] = rL * (1 - (gg - 1) / 2. * u4 / cL) ** (2 / (gg - 1))
-    v_analytic[1, x_fanleft:x_fanright] = u4
-    v_analytic[2, x_fanleft:x_fanright] = pL * (1 - (gg - 1) / 2. * u4 / cL) ** (2 * gg / (gg - 1))
+    u4 = 2 / (gam + 1) * (cL + (x[x_fanleft:x_fanright] - x[x0]) / T)
+    U_analytic[0, x_fanleft:x_fanright] = rho_l * (1 - (gam - 1) / 2. * u4 / cL) ** (2 / (gam - 1))
+    U_analytic[1, x_fanleft:x_fanright] = u4
+    U_analytic[2, x_fanleft:x_fanright] = p_l * (1 - (gam - 1) / 2. * u4 / cL) ** (2 * gam / (gam - 1))
 
     # region L
-    v_analytic[0, :x_fanleft] = rL
-    v_analytic[1, :x_fanleft] = uL
-    v_analytic[2, :x_fanleft] = pL
+    U_analytic[0, :x_fanleft] = rho_l
+    U_analytic[1, :x_fanleft] = u_l
+    U_analytic[2, :x_fanleft] = p_l
 
-    return v_analytic
+    return U_analytic
 
 if __name__ == '__main__':
 
-    # Physics
-    gg = 1.4  # gamma = C_v / C_p = 7/5 for ideal gas
-    rL, uL, pL = 1.0, 0.0, 1;
-    rR, uR, pR = 0.125, 0.0, .1;
-
-    # Set Disretization
+    # Set Discretization
     Nx = 100
     X = 1.
     dx = X / (Nx - 1)
-    xs = np.linspace(0, X, Nx)
-    x0 = Nx // 2
+    x_vec = np.linspace(0, X, Nx)
     T = 0.2
 
-    analytic = SodShockAnalytic(rL, uL, pL, rR, uR, pR, xs, x0, T, gg)
+    U_analytic = SodShockAnalytic(x_vec, T)
 
-    fig, axs = plt.subplots(1, 3, figsize=(8, 2), layout='constrained')
-    axs[0].set_title("Density")
-    axs[0].plot(xs, analytic[0].T)
-    axs[1].set_title("Velocity")
-    axs[1].plot(xs, analytic[1].T)
-    axs[1].set_yticks([0., .2, .4, .6, .8, 1.], ['', '', '', '', '', ''])
-    axs[2].set_title("Pressure")
-    axs[2].plot(xs, analytic[2].T)
-    axs[2].set_yticks([0., .2, .4, .6, .8, 1.], ['', '', '', '', '', ''])
+    fig, ax = plt.subplots(1, 3, figsize=(12, 5))
+    ax[0].set_title("Density")
+    ax[0].plot(x_vec, U_analytic[0].T)
+    ax[0].set_xlabel('x')
+    ax[0].set_ylabel(r'$\rho$')
+
+    ax[1].set_title("Flow speed")
+    ax[1].plot(x_vec, U_analytic[1].T)
+    ax[1].set_xlabel('x')
+    ax[1].set_ylabel(r'$u$')
+
+    ax[2].set_title("Pressure")
+    ax[2].plot(x_vec, U_analytic[2].T)
     for i in range(3):
-        axs[i].set_xlim([0., 1.])
-        axs[i].set_ylim([-.05, 1.05])
+        ax[i].set_xlim([0., 1.])
+        ax[i].set_ylim([-.05, 1.05])
+    ax[2].set_xlabel('x')
+    ax[2].set_ylabel(r'$p$')
+
+    plt.tight_layout()
+    plt.show()
