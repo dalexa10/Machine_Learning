@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import os
+import json
 import pickle
 import time
 
@@ -126,32 +127,31 @@ def train_NN_Euler_equations(config_dict):
     # Start timer
     start_time = time.time()
 
-    # Unpack config_dict
-    ext_domain = config_dict['ext_domain']
-    weights = config_dict['weights']
+    # Define time boundary (default)
+    t_lb, t_ub = 0., 0.2
+
+    # Define the space boundary
+    x_lb, x_ub = config_dict['domain']
+    if x_lb < 0:
+        ext_domain_str = '_ext'
+    else:
+        ext_domain_str = ''
+
+    # Define weights for losses
+    w_pde, w_ic = config_dict['weights']
+    if w_pde != 1 or w_ic != 1:
+        weights_str = '_w'
+    else:
+        weights_str = ''
+
+    # Define the width and hidden layers
     width = config_dict['width']
     hidden = config_dict['hidden']
+
+    # Define training parameters
     n_epochs = config_dict['n_epochs']
     lr = config_dict['lr']
     activation = config_dict['activation']
-
-    t_lb, t_ub = 0., 0.2
-
-    # Set domain bounds
-    if ext_domain == 0:
-        x_lb, x_ub = 0., 1.
-        ext_domain_str = ''
-    else:
-        x_lb, x_ub = -1.5, 3.125
-        ext_domain_str = '_ext'
-
-    # Set weights (activated or not)
-    if weights == 0:
-        w_pde, w_ic = 1., 1.
-        weights_str = ''
-    else:
-        w_pde, w_ic = 0.1, 10
-        weights_str = '_w'
 
     # Device configuration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -160,11 +160,16 @@ def train_NN_Euler_equations(config_dict):
     torch.manual_seed(23447)
     model = ffnn(nn_width=width, nn_hidden=hidden, activation_type=activation).to(device)
 
-    # Sampling points
-    nx = 1000
-    nt = 1000
-    n_i_train = 1000
-    n_f_train = 15000
+    if config_dict['sampling_mode']:
+        # Sampling points
+        nx = config_dict.get('x_points', 1000)
+        nt = config_dict.get('t_points', 1000)
+        n_i_train = config_dict.get('bc_points', nx)
+        n_f_train = config_dict.get('percent_int_points', 15) * nx * nt // 100
+
+    else:
+        #TODO: Implement a probability distribution sampling strategy
+        pass
 
     # Set the vectors
     x = np.linspace(x_lb, x_ub, nx)
@@ -214,45 +219,52 @@ def train_NN_Euler_equations(config_dict):
         if i % 100 == 0:
             print('Epoch: %d, LossIC: %.5f, LossPDE: %.5f, Loss: %5f' % (i, loss_IC.item(), loss_PDE.item(), loss.item()))
 
-    # Create subfolder with training_results
-    subfolder_name = ('output' + ext_domain_str + weights_str + '_nn_' + str(width) + '_' + str(hidden)
-                      + '_' + activation + '_lr_' + str(lr) + '_epochs_' + str(n_epochs))
-    subfolder_path = os.path.join(os.getcwd(), 'training_results', subfolder_name)
+    # End time
+    end_time = time.time()
+
+    # Create sub folder with training_results
+    subfolder_path = os.path.join(os.getcwd(), 'training_results')
     os.makedirs(subfolder_path, exist_ok=True)
+
+    # Get the number of cases already existing
+    n_cases = len([f for f in os.listdir(subfolder_path)
+                   if os.path.isfile(os.path.join(subfolder_path, f))])
+
+    case_path = os.path.join(subfolder_path, 'case_' + str(n_cases))
+    os.makedirs(case_path, exist_ok=True)
+
+    # Store metadata of model training (dictionary) in json file
+    metadata_file = os.path.join(case_path, 'case_metadata.txt')
+    metadata_dict = config_dict.copy()
+    metadata_dict['ext_domain_activated'] = ext_domain_str
+    metadata_dict['weights_activated'] = weights_str
+    metadata_dict['time'] = end_time - start_time
+
+    # Store model metadata in json
+    json_data = json.dumps(metadata_dict, indent=2)
+
+    with open(metadata_file, 'w') as f:
+        f.write(json_data)
+
+    # Store model metadata in pickle
+    with open(os.path.join(case_path, 'metadata_dict.pkl'), 'wb') as f:
+        pickle.dump(metadata_dict, f)
 
     # Store loss history
     file_name_loss_hist = 'loss_history.pkl'
 
-    with open(os.path.join(subfolder_path, file_name_loss_hist), 'wb') as f:
+    with open(os.path.join(case_path, file_name_loss_hist), 'wb') as f:
         pickle.dump(loss_history, f)
 
     # Store model state
     torch.save(model.state_dict(), os.path.join(subfolder_path, 'model.pth'))
-
-    # End time
-    end_time = time.time()
-
-    model_data_dict = {'case_name': subfolder_name,
-                       'loss_history': loss_history,
-                       'lr': lr,
-                       'n_epochs': n_epochs,
-                       'activation': activation,
-                       'width': width,
-                       'hidden': hidden,
-                       'ext_domain': ext_domain,
-                       'weights': weights,
-                       'device': device,
-                       'time': end_time - start_time}
-
-    with open(os.path.join(subfolder_path, 'data_dict.pkl'), 'wb') as f:
-        pickle.dump(model_data_dict, f)
 
     # Print elapsed time and model information
     print('-----------------------------------------')
     print('Model outcomes information:')
     print('-----------------------------------------')
     print('device: {}'.format(device))
-    print('Total trainning time: {:.3f} seconds'.format(end_time - start_time))
+    print('Total training time: {:.3f} seconds'.format(end_time - start_time))
 
     return None
 
@@ -301,13 +313,18 @@ if __name__ == '__main__':
     # --------------------------------------------------------
     #                Single case running
     # --------------------------------------------------------
-    case_dict = {'ext_domain': 1,
-                    'weights': 1,
-                    'width': 30,
-                    'hidden': 7,
-                    'n_epochs': 50000,
-                    'lr': 0.0005,
-                    'activation': 'tanh'}
+    case_dict = {'domain': [0, 1],   # [x_lb, x_ub]
+                 'weights': [1, 1],  # [w_ic, w_pde]
+                 'width': 30,
+                 'hidden': 7,
+                 'n_epochs': 50000,
+                 'lr': 0.0005,
+                 'activation': 'tanh',
+                 'sampling_mode': 'uniform',
+                 't_points': 1000,
+                 'x_points': 1000,
+                 'percent_int_points': 15,
+                 'bc_points': 1000}
 
 
 
