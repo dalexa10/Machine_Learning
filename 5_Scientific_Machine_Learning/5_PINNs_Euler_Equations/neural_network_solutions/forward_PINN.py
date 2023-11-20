@@ -257,7 +257,7 @@ def train_NN_Euler_equations(config_dict):
         pickle.dump(loss_history, f)
 
     # Store model state
-    torch.save(model.state_dict(), os.path.join(subfolder_path, 'model.pth'))
+    torch.save(model.state_dict(), os.path.join(case_path, 'model.pth'))
 
     # Print elapsed time and model information
     print('-----------------------------------------')
