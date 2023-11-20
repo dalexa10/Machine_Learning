@@ -314,12 +314,12 @@ if __name__ == '__main__':
     #                Single case running
     # --------------------------------------------------------
     case_dict = {'domain': [0, 1],   # [x_lb, x_ub]
-                 'weights': [1, 1],  # [w_ic, w_pde]
+                 'weights': [1, 1],  # [wpde, wic]
                  'width': 30,
                  'hidden': 7,
-                 'n_epochs': 50000,
-                 'lr': 0.0005,
                  'activation': 'tanh',
+                 'lr': 0.0005,
+                 'n_epochs': 50000,
                  'sampling_mode': 'uniform',
                  't_points': 1000,
                  'x_points': 1000,
