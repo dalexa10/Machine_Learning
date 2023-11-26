@@ -140,7 +140,7 @@ def compute_polynomials(u_vec, p, side):
         left: k - 1/2
     """
     c_rj = cr_coefficients(p)
-    global K, Km2, Km1, Kp2, Kp1
+    K, Km1, Km2, Kp1, Kp2 = generate_indexes(u_vec.shape[1])
 
     if p == 2:
         if side == 'right':
@@ -167,7 +167,7 @@ def compute_polynomials(u_vec, p, side):
 def compute_beta(u_vec, p):
     """ Calculate smoothness indicators beta """
 
-    global K, Km2, Km1, Kp2, Kp1
+    K, Km1, Km2, Kp1, Kp2 = generate_indexes(u_vec.shape[1])
     if p == 2:
         beta0 = (u_vec[:, Kp1] - u_vec[:, K])**2
         beta1 = (u_vec[:, K] - u_vec[:, Km1])**2
@@ -220,7 +220,7 @@ def WENO3(u_vec, eps, p=2):
         u_hat_plus
         for a third order polynomial (p = 3)
     """
-    global K, Km2, Km1, Kp2, Kp1
+    K, Km1, Km2, Kp1, Kp2 = generate_indexes(u_vec.shape[1])
 
     # ------ \hat_{u}_{k + 1/2} ---------
     p0_r, p1_r = compute_polynomials(u_vec, p, side='right')
@@ -238,7 +238,8 @@ def WENO3(u_vec, eps, p=2):
 
 def RK2_Integration(u_vec, hx, ht, p, eps):
     """ Two-stage Runge-Kutta integration of constructed u vectors """
-    global Km1, Km2, K, Kp1, Kp2
+
+    K, Km1, Km2, Kp1, Kp2 = generate_indexes(u_vec.shape[1])
 
     # --------- First stage -----------
     u_hat_minus_1, u_hat_plus_1 = WENO3(u_vec, eps)
@@ -276,7 +277,7 @@ def WENO5(u_vec, eps, p=3):
         u_hat_plus
         for a third order polynomial (p = 3)
     """
-    global K, Km2, Km1, Kp2, Kp1
+    K, Km1, Km2, Kp1, Kp2 = generate_indexes(u_vec.shape[1])
 
     # ------ \hat_{u}_{k + 1/2} ---------
     p0_r, p1_r, p2_r = compute_polynomials(u_vec, p, side='right')
@@ -294,7 +295,7 @@ def WENO5(u_vec, eps, p=3):
 
 def RK3_Integration(u_vec, hx, ht, p, eps):
     """ Three-stage Runge-Kutta integration of constructed u vectors """
-    global Km1, Km2, K, Kp1, Kp2
+    K, Km1, Km2, Kp1, Kp2 = generate_indexes(u_vec.shape[1])
 
     # --------- First stage -----------
     u_hat_minus_1, u_hat_plus_1 = WENO5(u_vec, eps)
@@ -332,7 +333,7 @@ def RK3_Integration(u_vec, hx, ht, p, eps):
     return u_vec, P_vec
 
 
-def solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, anim=True):
+def solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, store_data=True):
     """
     Solves the Euler Equations using a WENO scheme with RK integration
     :param nx: (int) Number of points in x (discretization in x)
@@ -342,16 +343,17 @@ def solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, anim=True):
                 if p=2, time integration is with RK2
                 if p=3, time integration is with RK3
     :param eps: (float), epsilum value intrinsic for WENO #TODO clarify this
-    :param anim: (bool), if True returns animation
+    :param store_data: (bool), if True returns animation
     :return:
-        u_vec (np.array) 4xn numpy array with the states of interests (rho, u, P, E)^T
-
+        x (np.array) discretized points in x
+        U_final (np.array) 4xn numpy array with the states of interests (rho, u, P, E)^T
+        data_dict (dict): #TODO specify content
     """
+
     # -------------------------------------
     #            Pre - Processing
     # --------------------------------------
-    data_dict = {}
-    anim_dict = {'t': [],
+    data_dict = {'t': [],
                  'x': None,
                  'rho': [],
                  'u': [],
@@ -360,14 +362,13 @@ def solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, anim=True):
 
     # Discretization, space vector and time initialization
     x, hx = np.linspace(0, 1, nx, endpoint=True, retstep=True)
-    anim_dict['x'] = x
+    data_dict['x'] = x
     u_vec, P_vec = initial_fun(x)
     t_c = 0
 
     l_v = compute_eigenvalues(u_vec)
     max_l_0 = compute_lambda_max(l_v)
     ht = CFL * hx / max_l_0
-
 
     # -------------------------------------
     #               Computation
@@ -379,12 +380,12 @@ def solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, anim=True):
             u_vec, P_vec = RK3_Integration(u_vec, hx, ht, p, eps)
 
             # Animation section
-            if anim:
-                anim_dict['t'].append(t_c)
-                anim_dict['rho'].append(u_vec[0])
-                anim_dict['u'].append(u_vec[1])
-                anim_dict['E'].append(u_vec[2])
-                anim_dict['p'].append(P_vec)
+            if store_data:
+                data_dict['t'].append(t_c)
+                data_dict['rho'].append(u_vec[0])
+                data_dict['u'].append(u_vec[1] / u_vec[0])
+                data_dict['E'].append(u_vec[2])
+                data_dict['p'].append(P_vec)
 
             # Time update
             t_c += ht
@@ -402,12 +403,12 @@ def solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, anim=True):
             u_vec, P_vec = RK2_Integration(u_vec, hx, ht, p, eps)
 
             # Animation section
-            if anim:
-                anim_dict['t'].append(t_c)
-                anim_dict['rho'].append(u_vec[0])
-                anim_dict['u'].append(u_vec[1])
-                anim_dict['E'].append(u_vec[2])
-                anim_dict['p'].append(P_vec)
+            if store_data:
+                data_dict['t'].append(t_c)
+                data_dict['rho'].append(u_vec[0])
+                data_dict['u'].append(u_vec[1] / u_vec[0])
+                data_dict['E'].append(u_vec[2])
+                data_dict['p'].append(P_vec)
 
             # Time update
             t_c += ht
@@ -417,14 +418,25 @@ def solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, anim=True):
             max_l = compute_lambda_max(l_v)
             ht = CFL * hx / max_l
 
-    U = np.vstack((u_vec, P_vec))
+    U_final = np.vstack((u_vec[0, :], u_vec[1, :] / u_vec[0, :],
+                   u_vec[2, :], P_vec))
 
-    return x, U, anim_dict
+    return x, U_final, data_dict
 
 
 # -----------------------------------------------------
 #                   Aux. Functions
 # -----------------------------------------------------
+def generate_indexes(nx):
+    """ Generate needed indexes arrays used intenerally """
+
+    K = np.arange(0, nx)  # 0, ..., nx-1
+    Km1 = np.roll(K, 1)  # nx-1, 0, 1, ..., nx-2
+    Km2 = np.roll(K, 2)  # nx-2, 0, 1, ..., nx-3
+    Kp1 = np.roll(K, -1)  # 1, ..., nx
+    Kp2 = np.roll(K, -2)  # 2, ..., nx + 1
+
+    return K, Km1, Km2, Kp1, Kp2
 
 def compute_error(u_num, u_exact, hx):
     """ Compute the L2 norm of the error """
@@ -446,29 +458,14 @@ def formater_scientific(ax):
 
 if __name__ == '__main__':
 
-    import matplotlib
     import matplotlib.pyplot as plt
-    from matplotlib import animation
-
-
 
     # ----------------------------------------------
     #                  Inputs
     # ----------------------------------------------
-    nx = 100
+    nx = 1000
     T = 0.2
-
-    # --------------------------------------------
-    #                  Indexes
-    # --------------------------------------------
-    # Indexes arrays
-    K = np.arange(0, nx)  # 0, ..., nx-1
-    Km1 = np.roll(K, 1)  # nx-1, 0, 1, ..., nx-2
-    Km2 = np.roll(K, 2)  # nx-2, 0, 1, ..., nx-3
-    Kp1 = np.roll(K, -1)  # 1, ..., nx
-    Kp2 = np.roll(K, -2)  # 2, ..., nx + 1
-
-    x, U, anim_dict = solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, anim=True)
+    x, U, anim_dict = solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, store_data=True)
 
     # -------------------------------------
     #       Plotting (Final State only)
@@ -499,47 +496,6 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.show()
 
-    # -------------------------------------
-    #               Animation
-    # --------------------------------------
 
-    fig, ax = plt.subplots(1, 3, figsize=(12, 4.5))
-    [ax[i].set_box_aspect(1) for i in range(3)]
-    plt.tight_layout()
-
-    ax[0].set_xlabel('x')
-    ax[1].set_xlabel('x')
-    ax[2].set_xlabel('x')
-
-    ax[0].set_ylabel(r'$\rho$')
-    ax[1].set_ylabel('u')
-    ax[2].set_ylabel('p')
-
-    x_anim = anim_dict['x']
-    rho_anim, u_anim, p_anim = (np.array(anim_dict['rho']),
-                                np.array(anim_dict['u']), np.array(anim_dict['p']))
-
-
-    line0, = ax[0].plot(x_anim, rho_anim[0, :], c='red', lw=2, clip_on=False)
-    ax[1].set_ylim([- 0.1, np.max(u_anim) + 0.1])
-    line1, = ax[1].plot(x_anim, u_anim[0, :], c='blue', lw=2, clip_on=False)
-    line2, = ax[2].plot(x_anim, p_anim[0, :], c='green', lw=2, clip_on=False)
-
-    def init():
-        pass
-    def time_stepper(n):
-        line0.set_data(x_anim, rho_anim[n, :])
-        line1.set_data(x_anim, u_anim[n, :])
-        line2.set_data(x_anim, p_anim[n, :])
-
-        return line0, line1, line2,
-
-    nt_an = rho_anim.shape[0]  # Set this value as the lowest size (in time) between the vectors you want to animate
-    # In this case rho_an_2.shape[0] = 59 and rho_an.shape[0] = 60
-
-    ani = animation.FuncAnimation(fig, time_stepper,
-                                  frames=nt_an, interval=300,
-                                  init_func=init)
-    ani.save('anim.gif', writer='PillowWriter', fps=30)
 
 
