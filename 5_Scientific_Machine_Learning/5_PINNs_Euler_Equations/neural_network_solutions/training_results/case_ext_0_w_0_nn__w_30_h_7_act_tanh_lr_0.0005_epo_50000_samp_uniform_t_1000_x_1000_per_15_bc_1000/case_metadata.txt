@@ -1,0 +1,23 @@
+{
+  "domain": [
+    0,
+    1
+  ],
+  "weights": [
+    1,
+    1
+  ],
+  "width": 30,
+  "hidden": 7,
+  "n_epochs": 50000,
+  "lr": 0.0005,
+  "activation": "tanh",
+  "sampling_mode": "uniform",
+  "t_points": 1000,
+  "x_points": 1000,
+  "percent_int_points": 15,
+  "bc_points": 1000,
+  "ext_domain_activated": 0,
+  "weights_activated": 0,
+  "time": 10517.719037771225
+}
