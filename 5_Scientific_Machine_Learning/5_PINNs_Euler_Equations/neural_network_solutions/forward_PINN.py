@@ -182,8 +182,8 @@ def train_NN_Euler_equations(config_dict):
     # Sampling data
     nx = config_dict.get('x_points', 1000)
     nt = config_dict.get('t_points', 1000)
-    n_i_train = config_dict.get('bc_points', nx)
-    n_f_train = config_dict.get('percent_int_points', 15) * nx * nt // 100
+    n_i_train = int(config_dict.get('bc_points', nx))
+    n_f_train = int(config_dict.get('percent_int_points', 15) * nx * nt // 100)
 
     # Set the vectors
     x = np.linspace(x_lb, x_ub, nx)
@@ -216,17 +216,17 @@ def train_NN_Euler_equations(config_dict):
     t_int = T[id_f, 0][:, None]
     tx_int = np.hstack((t_int, x_int))
 
-    # Temporal plot to see distributions
-    import matplotlib.pyplot as plt
-    fig, ax = plt.subplots()
-    ax.scatter(x_ic, t_ic, c='r', label='IC points')
-    ax.scatter(x_int, t_int, c='r', label='Internal points')
-    ax.set_xlabel(r'$x$')
-    ax.set_ylabel(r'$t$')
-    ax.set_title(config_dict['sampling mode'])
-    ax.legend(loc='best')
-    plt.tight_layout()
-    plt.show()
+    # # Temporal plot to see distributions
+    # import matplotlib.pyplot as plt
+    # fig, ax = plt.subplots()
+    # ax.scatter(x_ic, t_ic, c='r', label='IC points')
+    # ax.scatter(x_int, t_int, c='b', label='Internal points')
+    # ax.set_xlabel(r'$x$')
+    # ax.set_ylabel(r'$t$')
+    # ax.set_title(config_dict['sampling_mode'])
+    # ax.legend(loc='best')
+    # plt.tight_layout()
+    # plt.show()
 
 
     # Convert to tensors
@@ -365,13 +365,13 @@ if __name__ == '__main__':
                       'bc_points': 1000}
                   }
 
-    # # Serialize the training
-    # for case in cases_dict.values():
-    #     train_NN_Euler_equations(case)
+    # Serialize the training
+    for case in cases_dict.values():
+        train_NN_Euler_equations(case)
 
-    # Parallelize the training
-    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-        pool.map(train_NN_Euler_equations, cases_dict.values())
+    # # Parallelize the training
+    # with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+    #     pool.map(train_NN_Euler_equations, cases_dict.values())
 
     # --------------------------------------------------------
     #                Single case running
