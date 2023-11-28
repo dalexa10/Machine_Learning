@@ -1,11 +1,30 @@
 # Import needed modules
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import numpy as np
 import os
 import json
 import pickle
 import time
+def clustered_index(t_grid, x_grid, n_f_train):
+
+    # Parameters of the line
+    slope = 2/3
+    intercept = -1/3
+
+    # Calculate distance of each point in the meshgrid to the line
+    dist_to_line = np.abs(t_grid - slope * x_grid - intercept)
+
+    # Define a probability distribution with higher priority near the line
+    probability = np.exp(-dist_to_line * 7)
+    probability /= probability.sum()
+
+    # Randomly sample points based on the probability distribution
+    id_f = np.random.choice(np.arange(len(x_grid.flatten())), n_f_train, p=probability.flatten())
+
+    return id_f
+
 
 class ffnn(nn.Module):
     """
@@ -133,16 +152,16 @@ def train_NN_Euler_equations(config_dict):
     # Define the space boundary
     x_lb, x_ub = config_dict['domain']
     if x_lb < 0:
-        ext_domain_str = '_ext'
+        ext_domain_str = 1
     else:
-        ext_domain_str = ''
+        ext_domain_str = 0
 
     # Define weights for losses
     w_pde, w_ic = config_dict['weights']
     if w_pde != 1 or w_ic != 1:
-        weights_str = '_w'
+        weights_str = 1
     else:
-        weights_str = ''
+        weights_str = 0
 
     # Define the width and hidden layers
     width = config_dict['width']
@@ -160,16 +179,11 @@ def train_NN_Euler_equations(config_dict):
     torch.manual_seed(23447)
     model = ffnn(nn_width=width, nn_hidden=hidden, activation_type=activation).to(device)
 
-    if config_dict['sampling_mode']:
-        # Sampling points
-        nx = config_dict.get('x_points', 1000)
-        nt = config_dict.get('t_points', 1000)
-        n_i_train = config_dict.get('bc_points', nx)
-        n_f_train = config_dict.get('percent_int_points', 15) * nx * nt // 100
-
-    else:
-        #TODO: Implement a probability distribution sampling strategy
-        pass
+    # Sampling data
+    nx = config_dict.get('x_points', 1000)
+    nt = config_dict.get('t_points', 1000)
+    n_i_train = config_dict.get('bc_points', nx)
+    n_f_train = config_dict.get('percent_int_points', 15) * nx * nt // 100
 
     # Set the vectors
     x = np.linspace(x_lb, x_ub, nx)
@@ -178,10 +192,8 @@ def train_NN_Euler_equations(config_dict):
     T = t_grid.flatten()[:, None]
     X = x_grid.flatten()[:, None]  # Same as reshape
 
+    # Initial condition (boundary points)
     id_ic = np.random.choice(nx, n_i_train, replace=False)  # Random sample numbering for IC
-    id_f = np.random.choice(nx * nt, n_f_train, replace=False)  # Random sample numbering for interior
-
-    # Initial condition points
     x_ic = x_grid[id_ic, 0][:, None]
     t_ic = t_grid[id_ic, 0][:, None]
     rho_ic, u_ic, p_ic = set_initial_conditions(x_ic)
@@ -194,9 +206,28 @@ def train_NN_Euler_equations(config_dict):
     p_ic_train = torch.tensor(p_ic, dtype=torch.float32).to(device)
 
     # Internal points
+    if config_dict['sampling_mode'] == 'uniform':
+        # Random points
+        id_f = np.random.choice(nx * nt, n_f_train, replace=False)
+    else:
+        id_f = clustered_index(t_grid, x_grid, n_f_train)
+
     x_int = X[id_f, 0][:, None]
     t_int = T[id_f, 0][:, None]
     tx_int = np.hstack((t_int, x_int))
+
+    # Temporal plot to see distributions
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    ax.scatter(x_ic, t_ic, c='r', label='IC points')
+    ax.scatter(x_int, t_int, c='r', label='Internal points')
+    ax.set_xlabel(r'$x$')
+    ax.set_ylabel(r'$t$')
+    ax.set_title(config_dict['sampling mode'])
+    ax.legend(loc='best')
+    plt.tight_layout()
+    plt.show()
+
 
     # Convert to tensors
     tx_int_train = torch.tensor(tx_int, requires_grad=True, dtype=torch.float32).to(device)
@@ -226,11 +257,15 @@ def train_NN_Euler_equations(config_dict):
     subfolder_path = os.path.join(os.getcwd(), 'training_results')
     os.makedirs(subfolder_path, exist_ok=True)
 
-    # Get the number of cases already existing
-    n_cases = len([f for f in os.listdir(subfolder_path)
-                   if os.path.isfile(os.path.join(subfolder_path, f))])
+    # Set the name of the subfolder for case
+    case_name = ('case_' + 'ext_' + str(ext_domain_str) + '_w_' + str(weights_str) +
+                 '_nn_' + '_w_' + str(width) + '_h_' + str(hidden) + '_act_' +
+                 activation + '_lr_' + str(lr) + '_epo_' + str(n_epochs) +
+                 '_samp_' + config_dict['sampling_mode'] + '_t_' + str(nt) +
+                 '_x_' + str(nx) + '_per_' + str(config_dict['percent_int_points']) +
+                 '_bc_' + str(n_i_train))
 
-    case_path = os.path.join(subfolder_path, 'case_' + str(n_cases))
+    case_path = os.path.join(subfolder_path, case_name)
     os.makedirs(case_path, exist_ok=True)
 
     # Store metadata of model training (dictionary) in json file
@@ -259,6 +294,9 @@ def train_NN_Euler_equations(config_dict):
     # Store model state
     torch.save(model.state_dict(), os.path.join(case_path, 'model.pth'))
 
+    # Free CUDA memory
+    torch.cuda.empty_cache()
+
     # Print elapsed time and model information
     print('-----------------------------------------')
     print('Model outcomes information:')
@@ -275,57 +313,80 @@ if __name__ == '__main__':
     #               Multiprocessing trainning
     # --------------------------------------------------------
 
-    # import multiprocessing
-    #
-    # cases_dict = {0: {'ext_domain': 0,
-    #                   'weights': 0,
-    #                   'width': 30,
-    #                   'hidden': 7,
-    #                   'n_epochs': 20000,
-    #                   'lr': 0.0005,
-    #                   'activation': 'tanh'},
-    #               1: {'ext_domain': 1,
-    #                   'weights': 0,
-    #                   'width': 30,
-    #                   'hidden': 7,
-    #                   'n_epochs': 20000,
-    #                   'lr': 0.0005,
-    #                   'activation': 'tanh'},
-    #               2: {'ext_domain': 0,
-    #                   'weights': 1,
-    #                   'width': 30,
-    #                   'hidden': 7,
-    #                   'n_epochs': 20000,
-    #                   'lr': 0.0005,
-    #                   'activation': 'tanh'},
-    #               3: {'ext_domain': 1,
-    #                   'weights': 1,
-    #                   'width': 30,
-    #                   'hidden': 7,
-    #                   'n_epochs': 20000,
-    #                   'lr': 0.0005,
-    #                   'activation': 'tanh'}}
-    #
-    # # Parallelize the training
-    # with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-    #     pool.map(train_NN_Euler_equations, cases_dict.values())
+    import multiprocessing
+
+    cases_dict = {0: {'domain': [0, 1],   # [x_lb, x_ub]
+                      'weights': [1, 1],
+                      'width': 30,
+                      'hidden': 7,
+                      'n_epochs': 80000,
+                      'lr': 0.0005,
+                      'activation': 'tanh',
+                      'sampling_mode': 'uniform',
+                      't_points': 1000,
+                      'x_points': 1000,
+                      'percent_int_points': 11,
+                      'bc_points': 1000},
+                  1: {'domain': [0, 1],  # [x_lb, x_ub]
+                      'weights': [1, 1],
+                      'width': 30,
+                      'hidden': 7,
+                      'n_epochs': 100000,
+                      'lr': 0.0005,
+                      'activation': 'tanh',
+                      'sampling_mode': 'uniform',
+                      't_points': 1000,
+                      'x_points': 1000,
+                      'percent_int_points': 11,
+                      'bc_points': 1000},
+                  2: {'domain': [0, 1],  # [x_lb, x_ub]
+                      'weights': [1, 1],
+                      'width': 30,
+                      'hidden': 7,
+                      'n_epochs': 80000,
+                      'lr': 0.0005,
+                      'activation': 'tanh',
+                      'sampling_mode': 'uniform',
+                      't_points': 1000,
+                      'x_points': 1000,
+                      'percent_int_points': 20,
+                      'bc_points': 1000},
+                  3: {'domain': [0, 1],  # [x_lb, x_ub]
+                      'weights': [1, 1],
+                      'width': 30,
+                      'hidden': 7,
+                      'n_epochs': 80000,
+                      'lr': 0.0005,
+                      'activation': 'tanh',
+                      'sampling_mode': 'uniform',
+                      't_points': 1000,
+                      'x_points': 1000,
+                      'percent_int_points': 30,
+                      'bc_points': 1000}
+                  }
+
+    # # Serialize the training
+    # for case in cases_dict.values():
+    #     train_NN_Euler_equations(case)
+
+    # Parallelize the training
+    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+        pool.map(train_NN_Euler_equations, cases_dict.values())
 
     # --------------------------------------------------------
     #                Single case running
     # --------------------------------------------------------
-    case_dict = {'domain': [0, 1],   # [x_lb, x_ub]
-                 'weights': [1, 1],  # [wpde, wic]
-                 'width': 30,
-                 'hidden': 7,
-                 'activation': 'tanh',
-                 'lr': 0.0005,
-                 'n_epochs': 50000,
-                 'sampling_mode': 'uniform',
-                 't_points': 1000,
-                 'x_points': 1000,
-                 'percent_int_points': 15,
-                 'bc_points': 1000}
-
-
-
-
+    # case_dict = {'domain': [0, 1],   # [x_lb, x_ub]
+    #              'weights': [1, 1],  # [wpde, wic]
+    #              'width': 30,
+    #              'hidden': 7,
+    #              'activation': 'tanh',
+    #              'lr': 0.0005,
+    #              'n_epochs': 500,
+    #              'sampling_mode': 'uniform',
+    #              't_points': 1000,
+    #              'x_points': 1000,
+    #              'percent_int_points': 15,
+    #              'bc_points': 1000}
+    #
+    # train_NN_Euler_equations(case_dict)
