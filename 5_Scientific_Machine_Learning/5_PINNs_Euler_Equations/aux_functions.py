@@ -7,25 +7,6 @@ import torch
 import pickle
 from neural_network_solutions import forward_PINN
 
-
-def clustered_index(t_grid, x_grid, n_f_train):
-
-    # Parameters of the line
-    slope = 2/3
-    intercept = -1/3
-
-    # Calculate distance of each point in the meshgrid to the line
-    dist_to_line = np.abs(t_grid - slope * x_grid - intercept)
-
-    # Define a probability distribution with higher priority near the line
-    probability = np.exp(-dist_to_line * 7)
-    probability /= probability.sum()
-
-    # Randomly sample points based on the probability distribution
-    id_f = np.random.choice(np.arange(len(x_grid.flatten())), n_f_train, p=probability.flatten())
-
-    return id_f
-
 def load_all_trained_models(device):
     """ """
 
