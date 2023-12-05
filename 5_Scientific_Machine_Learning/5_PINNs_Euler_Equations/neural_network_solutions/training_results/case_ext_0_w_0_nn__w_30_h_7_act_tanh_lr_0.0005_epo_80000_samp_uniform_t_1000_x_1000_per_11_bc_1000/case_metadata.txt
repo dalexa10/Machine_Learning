@@ -19,5 +19,6 @@
   "bc_points": 1000,
   "ext_domain_activated": 0,
   "weights_activated": 0,
-  "time": 12897.058220148087
+  "time": 4571.864177703857,
+  "time_per_step": 0.05714830222129822
 }
