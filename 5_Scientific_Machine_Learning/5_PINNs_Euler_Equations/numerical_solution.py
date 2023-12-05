@@ -418,8 +418,7 @@ def solve_Euler_PDE_WENO(nx, T, p=3, CFL=0.8, eps=1e-6, store_data=True):
             max_l = compute_lambda_max(l_v)
             ht = CFL * hx / max_l
 
-    U_final = np.vstack((u_vec[0, :], u_vec[1, :] / u_vec[0, :],
-                   u_vec[2, :], P_vec))
+    U_final = np.vstack((u_vec[0, :], u_vec[1, :] / u_vec[0, :], P_vec, u_vec[2, :]))
 
     return x, U_final, data_dict
 
