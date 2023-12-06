@@ -28,7 +28,7 @@
 \hrule
 
 \begin{center}
-	\insertmovie{0.49}{animation_1.png}{animation_1.mov}
+	\insertmovie{0.7}{animation_1.png}{animation_1.mov}
 \end{center}
 
 
@@ -171,20 +171,20 @@ Approximate solution of the Euler equations using a neural network and a set of 
 %======================================================================
 
 
-%======================================================================
-\begin{frame}\frametitle{Training workflow}
-	
-	Add a diagram that explains:
-	\begin{itemize}
-		\item Platform used
-		\item Data workflow (github, local, remote)
-		\item Platform used for development
-				
-	\end{itemize}
-	
-	
-\end{frame}
-%======================================================================
+%%======================================================================
+%\begin{frame}\frametitle{Training workflow}
+%	
+%	Add a diagram that explains:
+%	\begin{itemize}
+%		\item Platform used
+%		\item Data workflow (github, local, remote)
+%		\item Platform used for development
+%				
+%	\end{itemize}
+%	
+%	
+%\end{frame}
+%%======================================================================
 
 
 %======================================================================
@@ -229,53 +229,146 @@ Approximate solution of the Euler equations using a neural network and a set of 
 
 
 %======================================================================
-\begin{frame}\frametitle{Results and Analysis}
+\begin{frame}\frametitle{Results and Analysis - Original model}
+	The models were trained by using a neural network (30-neuron width \& 7 hidden layers), a learning rate of 0.0005
+	and the classical Adam optimizer.
+	
+	\begin{center}
+		\insertmovie{0.9}{animation_0.png}{animation_0.mov} \\
+	\end{center}
 	
 	
+\end{frame}
+%======================================================================
+
+%======================================================================
+\begin{frame}\frametitle{Results and Analysis - Original model}
+	
+	\begin{center}
+		\includegraphics[width=0.68\textwidth]{Figures/Figure_1.pdf}
+	\end{center}	
+\end{frame}
+%======================================================================
+
+
+%======================================================================
+\begin{frame}\frametitle{Results and Analysis - Original model}
+	
+	\begin{center}
+		\includegraphics[width=0.82\textwidth]{Figures/Figure_2.png}
+	\end{center}	
+\end{frame}
+%======================================================================
+
+%======================================================================
+\begin{frame}\frametitle{Results and Analysis - Original model}
+	
+	\begin{center}
+		\includegraphics[width=0.9\textwidth]{Figures/Figure_3.pdf}
+	\end{center}	
+\end{frame}
+%======================================================================
+
+
+%======================================================================
+\begin{frame}\frametitle{Results and Analysis - W. + Ext. Dom}
+	
+	\begin{center}
+		\includegraphics[width=0.68\textwidth]{Figures/Figure_5.pdf}
+	\end{center}	
+\end{frame}
+%======================================================================
+
+
+%======================================================================
+\begin{frame}\frametitle{Results and Analysis -  W. + Ext. Dom}
+		
+	\begin{center}
+		\insertmovie{0.9}{animation_1.png}{animation_1.mov} \\
+	\end{center}
+
 \end{frame}
 %======================================================================
 
 
 
 %======================================================================
-\begin{frame}\frametitle{Results and Analysis}
-	\begin{itemize}
-		\item Domain extends towards the dominant direction of propagation \tiny (Papados, 2021)
-		\item  
-	\end{itemize}
+\begin{frame}\frametitle{Results and Analysis - W. + Ext. Dom}
 	
+	\begin{center}
+		\includegraphics[width=0.82\textwidth]{Figures/Figure_6.png}
+	\end{center}	
+\end{frame}
+%======================================================================
+
+%======================================================================
+\begin{frame}\frametitle{Results and Analysis - W. + Ext. Dom}
+		
+	\begin{center}
+		\includegraphics[width=0.9\textwidth]{Figures/Figure_7.pdf}
+	\end{center}	
+\end{frame}
+%======================================================================
+
+%======================================================================
+\begin{frame}\frametitle{Results - Clustered Sampling}
+	
+	\begin{center}
+		\insertmovie{0.9}{animation_2.png}{animation_2.mov} \\
+	\end{center}
 	
 \end{frame}
 %======================================================================
 
+%======================================================================
+\begin{frame}\frametitle{Results - Clustered Sampling}
+	
+	\begin{center}
+		\includegraphics[width=0.68\textwidth]{Figures/Figure_9.pdf}
+	\end{center}
+
+\end{frame}
+%======================================================================
+
+%======================================================================
+\begin{frame}\frametitle{Results - Clustered Sampling}
+	
+	\begin{center}
+		\includegraphics[width=0.82\textwidth]{Figures/Figure_10.png}
+	\end{center}
+	
+\end{frame}
+%======================================================================
 
 
 %======================================================================
 \begin{frame}\frametitle{Results - Clustered Sampling}
 	
+	\begin{center}
+		\includegraphics[width=0.9\textwidth]{Figures/Figure_11.pdf}
+	\end{center}
 	
 \end{frame}
 %======================================================================
 
-%======================================================================
-\begin{frame}\frametitle{Results - Influence of Neural Network Architecture}
-	
-	
-\end{frame}
-%======================================================================
 
 %======================================================================
 \begin{frame}\frametitle{Computational cost comparison}
 	
+	\begin{itemize}
+		\item Is it a fair comparison against the performance of the classical numerical methods?
+	\end{itemize}
+	
+
 	\begin{table}
 		\centering
-		\begin{tabular}{lc}
+		\begin{tabular}{lcc}
 			\hline
-			Method					& Evaluation time ($T=2$) [s] \\
+			\textcolor{myOrange}{Method} & \multicolumn{2}{c}{ \textcolor{myOrange}{Evaluation time ($T=2$) [s]}}    \\
+						& $n_x = 100$		& $n_x = 1000$ \\		
 			\hline
-			Analytic				& 			\\
-			WENO ($n_x = 100$)		&			\\
-			WENO ($n_x = 100$)		& 			\\
+			Analytic	& 0.07 & 0.52 \\
+			WENO (5\textsuperscript{th} - RK45) &	0.19  & 3.09 \\
 			\hline						
 		\end{tabular}				
 	\end{table}
@@ -285,13 +378,13 @@ Approximate solution of the Euler equations using a neural network and a set of 
 		\centering
 		\begin{tabular}{lccc}
 			\hline
-			Case					& Tr/epoch [s] & Tot. Tr. [s] & Eval. ($T=2$) [s] \\
+			\textcolor{myOrange}{Case} & \textcolor{myOrange}{Tr/epoch [s]} & \textcolor{myOrange}{Tot. Tr. [min]} & \textcolor{myOrange}{Eval. ($T=2$) [s]} \\
 			\hline
-			Nominal				&  &  & 			\\
-			Ext. Dom		&  &  &			\\
-			Loss W.		&  &  & 			\\
-			Ext. Dom. + Loss W.		&  &  & 			\\
-			E.D. + L.W. + C.S.		&  &  & 			\\
+			Nominal	& 175  & 2.11 &  0.008\\
+			Ext. Dom  & 129  & 1.55  &	0.007		\\
+			Loss W.		& 85 & 1.02 & 0.009			\\
+			Ext. Dom. + Loss W.	& 63  & 0.76  & 0.01 \\
+			E.D. + L.W. + C.S.	& 162  & 1.95 & 0.015 \\
 			\hline						
 		\end{tabular}				
 	\end{table}
@@ -303,69 +396,53 @@ Approximate solution of the Euler equations using a neural network and a set of 
 %======================================================================
 \begin{frame}\frametitle{Additional Results - Hyperparameter tuning}
 	
-	
-\end{frame}
-%======================================================================
-
-%======================================================================
-\begin{frame}\frametitle{Results and Analysis}
-	
-	% Original plot for T=0.1 and T=0.2 for plain NN comparing with WENO and exact
-	
-	\begin{itemize}
-		\item The outcomes from the mentioned trained models are shown below.
-		\item A comparison has been made only the exact solution at the desired time ($t=0.2$)
-	\end{itemize}
-	
 	\begin{center}
-		\includegraphics[width=0.65\textwidth]{Figures/preliminary_results.pdf}
+		\includegraphics[width=0.68\textwidth]{Figures/Figure_13.pdf}
 	\end{center}
+	
 \end{frame}
 %======================================================================
 
 %======================================================================
-\begin{frame}\frametitle{Summary}
-	
-	A public repository \includegraphics[width=0.05\textwidth]{Figures/github_logo.png} \alert{\href{https://github.com/dalexa10/Machine_Learning/tree/main/5_Scientific_Machine_Learning/5_PINNs_Euler_Equations}{link}} was setup to host the models implemented
-	
-	\vspace{3mm}
-	
-	Four different models were trained by using a neural network (30-neuron width \& 7 hidden layers), a learning rate of 0.0005
-	and the classical Adam optimizer. The epochs for these cases were set to 5000
-	
+\begin{frame}\frametitle{Summary and Conclusions}
+
 	\begin{itemize}
-		\item Space domain unaltered ($x \in [0, 1]$), no weights for losses
-		\item Space domain extended ($x \in [-1.5, 3.125]$), no weights for losses
-		\item Space domain unaltered ($x \in [0, 1]$), loss weights added (0.1 for PDE loss and 10 for IC loss)
-		\item Space domain extended ($x \in [-1.5, 3.125]$), loss weights added (0.1 for PDE loss and 10 for IC loss)
-	\end{itemize}
-	
-	
-	
-\end{frame}
-%======================================================================
-
-
-
-%======================================================================
-\begin{frame}\frametitle{Final Remarks}
-	
-	\textbf{\textcolor{myOrange}{Conclusions}} 
-	\begin{enumerate}
+		\item A public repository \includegraphics[width=0.05\textwidth]{Figures/github_logo.png} \alert{\href{https://github.com/dalexa10/Machine_Learning/tree/main/5_Scientific_Machine_Learning/5_PINNs_Euler_Equations}{link}} was setup to host the models implemented
+		
 		\item Hyperbolic PDEs highly depend on the initial conditions and its propagation parameters $\rightarrow$ Accuracy of NN increased if this learns the IC first (at higher rate).
+		
 		\item In all cases, the accuracy for the velocity and pressure is much higher than that for the density, which is due to the fact the
 		velocity and pressure are smooth while the density has a contact discontinuity.
+		
 		\item Domain extension and loss weighting demonstrated an improvement in the prediction of the neural network
+		
 		\item Clustered sampling showed a better prediction when keeping the NN hyperparameters fixed but it highly depends
 		on knowing where the discontinuity located beforehand.
+		
 		\item An informal hyperparameter tuning was carried out with no significant improvement in the prediction
-	\end{enumerate}
 	
-	\textbf{\textcolor{myOrange}{Future Work}}
+	
+	\end{itemize}
+
+	
+	
+\end{frame}
+%======================================================================
+
+
+
+%======================================================================
+\begin{frame}\frametitle{Future Work}
+	
 	\begin{itemize}
 		\item Add artificial viscosity to rectify the oscillations near shock and contact discontinuities $\rightarrow$ it might
 		be really expensive to train the model and it is considered a non-physical adjustment to the mathematical formulation
-		\item Impose a \textit{total variation diminishing} condition together with artificial viscosity into the NN  
+		
+		\item Impose a \textit{total variation diminishing} condition together with 
+		artificial viscosity into the NN  
+		
+		\item Perform a formal hyperparameters tuning study where the paramters are set
+		according to an optimization problem formulation and a gradient free or gradient descent method is employed $\rightarrow$ Heads up, this might be really expensive
 		
 	\end{itemize}
 	
