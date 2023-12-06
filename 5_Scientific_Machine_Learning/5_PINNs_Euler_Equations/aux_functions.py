@@ -5,7 +5,56 @@ from matplotlib import animation
 import matplotlib.pyplot as plt
 import torch
 import pickle
+from sklearn.metrics import mean_squared_error as MSE
 from neural_network_solutions import forward_PINN
+
+
+def load_single_trained_model(model_path, device):
+    """ """
+
+    model_dict = {}
+
+    try:
+        # Load model data
+        with open(os.path.join(model_path, 'metadata_dict.pkl'), 'rb') as f:
+            model_metadata = pickle.load(f)
+
+        # Load total training loss history
+        with open(os.path.join(model_path, 'loss_history.pkl'), 'rb') as f:
+            loss_history = pickle.load(f)
+
+        model = forward_PINN.ffnn(nn_width=model_metadata['width'],
+                                  nn_hidden=model_metadata['hidden'],
+                                  activation_type=model_metadata['activation']).to(device)
+        model.load_state_dict(torch.load(os.path.join(model_path, 'model.pth'), map_location=device))
+        model.eval()
+
+        # Load IC  (if available)
+        try:
+            with open(os.path.join(model_path, 'loss_IC.pkl'), 'rb') as f:
+                loss_history_ic = pickle.load(f)
+        except FileNotFoundError:
+            loss_history_ic = None
+
+        # Load BC  (if available)
+        try:
+            with open(os.path.join(model_path, 'loss_PDE.pkl'), 'rb') as f:
+                loss_history_PDE = pickle.load(f)
+        except FileNotFoundError:
+            loss_history_PDE = None
+
+        model_dict[0] = {'model': model,
+                        'model_metadata': model_metadata,
+                        'loss_history': loss_history,
+                        'loss_history_ic': loss_history_ic,
+                        'loss_history_PDE': loss_history_PDE,
+                        'case_name': model_path[42:]}
+
+    except FileNotFoundError:
+        print('FileNotFoundError')
+
+    return model_dict
+
 
 def load_all_trained_models(device):
     """ """
@@ -36,32 +85,14 @@ def load_all_trained_models(device):
             models_dict[i] = {'model': model,
                               'model_metadata': model_metadata,
                               'loss_history': loss_history,
+                               'loss_history_ic': None,
+                               'loss_history_PDE': None,
                               'case_name': case[42:]}  # 42 is the number of characters in the path 'neural_network_solutions/training_results/'
         except FileNotFoundError:
             print('FileNotFoundError')
             continue
 
     return models_dict
-
-def load_single_trained_model(model_path, device):
-    """ """
-    # Load model data
-    with open(os.path.join(model_path, 'metadata_dict.pkl'), 'rb') as f:
-        model_metadata = pickle.load(f)
-
-    # Load history training
-    with open(os.path.join(model_path, 'loss_history.pkl'), 'rb') as f:
-        loss_history = pickle.load(f)
-
-    model = forward_PINN.ffnn(nn_width=model_metadata['width'],
-                              nn_hidden=model_metadata['hidden'],
-                              activation_type=model_metadata['activation'])
-    model.load_state_dict(torch.load(os.path.join(model_path, 'model.pth'),
-                                     map_location=torch.device(device)))
-    model.eval()
-
-    return model, model_metadata, loss_history
-
 
 def eval_nn_model(models_dict, x_test, T, device):
     """ """
@@ -127,51 +158,65 @@ def generate_plot(models_dict):
     return fig, ax
 
 def generate_comparative_plot(x_nn, models_dict, x_exact, U_exact, x_num, U_num,
-                              custom_title=None, custom_legend=None):
+                              custom_title=None, custom_legend=None, legend_loss=False):
     """    """
     # Set legend lists
     if custom_legend is not None:
         legend_list = custom_legend
     else:
-        legend_list = [models_dict[k]['case_name'] for k in models_dict.keys()]
+        legend_list = ['Case_' + str(i) for i in models_dict.keys()]
 
     fig, ax = plt.subplots(2, 2, figsize=(10, 8))
 
     # Plot loss history
     for k in models_dict.keys():
-        ax[0, 0].plot(models_dict[k]['loss_history'])
-    ax[0, 0].set_xlabel('Epochs')
+        ax[0, 0].plot(models_dict[k]['loss_history'], alpha=0.75, label='Total loss')
+
+        if models_dict[k]['loss_history_ic'] is not None:
+            ax[0, 0].plot(models_dict[k]['loss_history_ic'], alpha=0.9, label='Loss Initial Conditions')
+
+        if models_dict[k]['loss_history_PDE'] is not None:
+            ax[0, 0].plot(models_dict[k]['loss_history_PDE'], alpha=0.75, label='Loss Physical Laws')
+
+    ax[0, 0].set_xlabel('Epochs', fontsize=14)
+    ax[0, 0].tick_params(axis='both', which='major', labelsize=12)
+    ax[0, 0].ticklabel_format(style='sci', axis='x')
     ax[0, 0].set_yscale('log')
-    ax[0, 0].set_ylabel('Loss')
-    ax[0, 0].set_title('Loss history')
+    ax[0, 0].set_ylabel('Loss', fontsize=14)
+    ax[0, 0].set_title('Loss history', fontsize=14)
+    if legend_loss:
+        ax[0, 0].legend(fontsize=12)
 
     # Plot density
     ax[0, 1].plot(x_exact, U_exact[0, :], 'k--')
     ax[0, 1].plot(x_num, U_num[0, :], 'r--')
     for k in models_dict.keys():
         ax[0, 1].plot(x_nn, models_dict[k]['rho_pred'])
-    ax[0, 1].set_xlabel(r'$x$')
-    ax[0, 1].set_ylabel(r'$\rho$')
-    ax[0, 1].set_title('Density')
+    ax[0, 1].tick_params(axis='both', which='major', labelsize=12)
+    ax[0, 1].set_xlabel(r'$x$', fontsize=14)
+    ax[0, 1].set_ylabel(r'$\rho$', fontsize=14)
+    ax[0, 1].set_title('Density', fontsize=14)
 
     # Plot flow speed
     ax[1, 0].plot(x_exact, U_exact[1, :], 'k--')
     ax[1, 0].plot(x_num, U_num[1, :], 'r--')
     for k in models_dict.keys():
         ax[1, 0].plot(x_nn, models_dict[k]['u_pred'])
-    ax[1, 0].set_xlabel(r'$x$')
-    ax[1, 0].set_ylabel(r'$u$')
-    ax[1, 0].set_title('Flow speed')
+    ax[1, 0].tick_params(axis='both', which='major', labelsize=12)
+    ax[1, 0].set_xlabel(r'$x$', fontsize=14)
+    ax[1, 0].set_ylabel(r'$u$', fontsize=14)
+    ax[1, 0].set_title('Flow speed', fontsize=14)
 
     # Plot pressure
     ax[1, 1].plot(x_exact, U_exact[2, :], 'k--', label='Analytic solution')
     ax[1, 1].plot(x_num, U_num[2, :], 'r--', label='Numerical solution')
     for idx, k in enumerate(models_dict.keys()):
         ax[1, 1].plot(x_nn, models_dict[k]['p_pred'], label=legend_list[idx])
-    ax[1, 1].set_xlabel(r'$x$')
-    ax[1, 1].set_ylabel(r'$p$')
-    ax[1, 1].set_title('Pressure')
-    ax[1, 1].legend()
+    ax[1, 1].tick_params(axis='both', which='major', labelsize=12)
+    ax[1, 1].set_xlabel(r'$x$', fontsize=14)
+    ax[1, 1].set_ylabel(r'$p$', fontsize=14)
+    ax[1, 1].set_title('Pressure', fontsize=14)
+    ax[1, 1].legend(fontsize=12)
 
     # Custom title
     if custom_title is not None:
@@ -181,6 +226,171 @@ def generate_comparative_plot(x_nn, models_dict, x_exact, U_exact, x_num, U_num,
 
     return fig, ax
 
+def generate_colormesh_plot(analytic_model, nn_model):
+    """ """
+    x = np.linspace(0, 1, 1000)
+    t = np.linspace(0, 0.2, 1000)
+    T, X = np.meshgrid(t, x)
+    tx = np.hstack((T.reshape(-1, 1), X.reshape(-1, 1)))
+
+    # Analytic solution
+    U_exact = np.zeros((3, X.shape[0], X.shape[1]))
+
+    for j in range(X.shape[1]):
+        U_exact[:, :, j] = analytic_model(x, t[j])
+
+    # Neural network solution
+    tx = torch.tensor(tx, dtype=torch.float32)
+    U_nn = nn_model(tx).detach().numpy()
+
+    # Plot density
+    fig, ax = plt.subplots(3, 3, figsize=(12, 8))
+
+    pc_den_ex = ax[0, 0].pcolormesh(T, X, U_exact[0, :, :], cmap='jet')
+    ax[0, 0].tick_params(axis='both', which='major', labelsize=12)
+    ax[0, 0].set_xlabel('t', fontsize=14)
+    ax[0, 0].set_ylabel('x', fontsize=14)
+    ax[0, 0].set_title('Density (Analytic)', fontsize=14)
+    fig.colorbar(pc_den_ex, ax=ax[0, 0])
+
+    pc_den_nn = ax[1, 0].pcolormesh(T, X, U_nn[:, 0].reshape(X.shape), cmap='jet')
+    ax[1, 0].tick_params(axis='both', which='major', labelsize=12)
+    ax[1, 0].set_xlabel('t', fontsize=14)
+    ax[1, 0].set_ylabel('x', fontsize=14)
+    ax[1, 0].set_title('Density (NN)', fontsize=14)
+    fig.colorbar(pc_den_nn, ax=ax[1, 0])
+
+    pc_den_err = ax[2, 0].pcolormesh(T, X, np.abs(U_exact[0, :, :].reshape(X.shape) -
+                                                  U_nn[:, 0].reshape(X.shape)) * 100 / U_exact[0, :, :].reshape(X.shape), cmap='jet')
+    ax[2, 0].tick_params(axis='both', which='major', labelsize=12)
+    ax[2, 0].set_xlabel('t', fontsize=14)
+    ax[2, 0].set_ylabel('x', fontsize=14)
+    ax[2, 0].set_title('Relative Error - Density', fontsize=14)
+    fig.colorbar(pc_den_err, ax=ax[2, 0])
+
+    # Plot flow speed
+    pc_sp_ex = ax[0, 1].pcolormesh(T, X, U_exact[1, :, :].reshape(X.shape), cmap='jet')
+    ax[0, 1].tick_params(axis='both', which='major', labelsize=12)
+    ax[0, 1].set_xlabel('t', fontsize=14)
+    ax[0, 1].set_ylabel('x', fontsize=14)
+    ax[0, 1].set_title('Flow speed (Analytic)', fontsize=14)
+    fig.colorbar(pc_sp_ex, ax=ax[0, 1])
+
+    pc_sp_nn = ax[1, 1].pcolormesh(T, X, U_nn[:, 1].reshape(X.shape), cmap='jet')
+    ax[1, 1].tick_params(axis='both', which='major', labelsize=12)
+    ax[1, 1].set_xlabel('t', fontsize=14)
+    ax[1, 1].set_ylabel('x', fontsize=14)
+    ax[1, 1].set_title('Flow speed (NN)', fontsize=14)
+    fig.colorbar(pc_sp_nn, ax=ax[1, 1])
+
+    pc_sp_err = ax[2, 1].pcolormesh(T, X, np.abs(U_exact[1, :, :].reshape(X.shape) -
+                                                  U_nn[:, 1].reshape(X.shape)) * 100 / (U_exact[1, :, :] +1e-12) .reshape(X.shape)
+                                    , cmap='jet')
+    ax[2, 1].tick_params(axis='both', which='major', labelsize=12)
+    ax[2, 1].set_xlabel('t', fontsize=14)
+    ax[2, 1].set_ylabel('x', fontsize=14)
+    ax[2, 1].set_title('Relative Error - Speed', fontsize=14)
+    fig.colorbar(pc_sp_err, ax=ax[2, 1])
+
+    # Plot pressure
+    pc_p_ex = ax[0, 2].pcolormesh(T, X, U_exact[2, :, :].reshape(X.shape), cmap='jet')
+    ax[0, 2].tick_params(axis='both', which='major', labelsize=12)
+    ax[0, 2].set_xlabel('t', fontsize=14)
+    ax[0, 2].set_ylabel('x', fontsize=14)
+    ax[0, 2].set_title('Pressure (Analytic)', fontsize=14)
+    fig.colorbar(pc_p_ex, ax=ax[0, 2])
+
+    pc_p_nn = ax[1, 2].pcolormesh(T, X, U_nn[:, 2].reshape(X.shape), cmap='jet')
+    ax[1, 2].tick_params(axis='both', which='major', labelsize=12)
+    ax[1, 2].set_xlabel('t', fontsize=14)
+    ax[1, 2].set_ylabel('x', fontsize=14)
+    ax[1, 2].set_title('Pressure (NN)', fontsize=14)
+    fig.colorbar(pc_p_nn, ax=ax[1, 2])
+
+    pc_p_err = ax[2, 2].pcolormesh(T, X, np.abs(U_exact[2, :, :].reshape(X.shape) -
+                                                  U_nn[:, 2].reshape(X.shape)) * 100 / U_exact[2, :, :].reshape(X.shape), cmap='jet')
+    ax[2, 2].tick_params(axis='both', which='major', labelsize=12)
+    ax[2, 2].set_xlabel('t', fontsize=14)
+    ax[2, 2].set_ylabel('x', fontsize=14)
+    ax[2, 2].set_title('Relative Error - Pressure', fontsize=14)
+    fig.colorbar(pc_p_err, ax=ax[2, 2])
+
+    plt.tight_layout()
+
+    return fig, ax
+
+def compute_error_at_timesteps(U_exact, U_nn, U_num):
+    """ """
+    # Exact solution
+    rho_ex, u_ex, p_ex = [np.array(U_exact[i, :]) for i in range(3)]
+
+    # Numerical solution
+    rho_num, u_num, p_num = [np.array(U_num[i, :]) for i in range(3)]
+
+    # Neural network solution
+    rho_nn, u_nn, p_nn = [np.array(U_nn[i, :]) for i in range(3)]
+
+    # Density error
+    rho_err_nn = [MSE(rho_ex[i, :], rho_nn[i, :]) for i in range(rho_ex.shape[0])]
+    rho_err_num = [MSE(rho_ex[i, :], rho_num[i, :]) for i in range(rho_ex.shape[0])]
+
+    # Flow speed error
+    u_err_nn = [MSE(u_ex[i, :], u_nn[i, :]) for i in range(u_ex.shape[0])]
+    u_err_num = [MSE(u_ex[i, :], u_num[i, :]) for i in range(u_ex.shape[0])]
+
+    # Pressure error
+    p_err_nn = [MSE(p_ex[i, :], p_nn[i, :]) for i in range(p_ex.shape[0])]
+    p_err_num = [MSE(p_ex[i, :], p_num[i, :]) for i in range(p_ex.shape[0])]
+
+    return [[rho_err_nn, u_err_nn, p_err_nn], [rho_err_num, u_err_num, p_err_num]]
+
+def generate_error_plot(t_vec, error_data_list, custom_legend=None):
+
+    if custom_legend is not None:
+        legend_list = custom_legend
+    else:
+        legend_list = []
+
+    fig, ax = plt.subplots(1, 3, figsize=(12, 4.5))
+
+    for i, error_data in enumerate(error_data_list):
+        rho_err_nn, u_err_nn, p_err_nn = error_data[0]
+        if i == 0:
+            rho_err_num, u_err_num, p_err_num = error_data[1]
+            ax[0].plot(t_vec, rho_err_num)
+            ax[1].plot(t_vec, u_err_num)
+            ax[2].plot(t_vec, p_err_num, label='Numerical')
+
+        # Plot density error
+        ax[0].plot(t_vec, rho_err_nn)
+
+        # Plot flow speed error
+        ax[1].plot(t_vec, u_err_nn)
+
+        # Plot pressure error
+        ax[2].plot(t_vec, p_err_nn, label='Case_' + str(i) + ' Neural network')
+
+    ax[0].set_xlabel('Time step', fontsize=14)
+    ax[0].set_ylabel('MSE', fontsize=14)
+    ax[0].set_title('Density error', fontsize=14)
+    ax[0].tick_params(axis='both', which='major', labelsize=12)
+
+    ax[1].set_xlabel('Time step', fontsize=14)
+    ax[1].set_ylabel('MSE', fontsize=14)
+    ax[1].set_title('Flow speed error', fontsize=14)
+    ax[1].tick_params(axis='both', which='major', labelsize=12)
+
+    ax[2].set_xlabel('Time step', fontsize=14)
+    ax[2].set_ylabel('MSE', fontsize=14)
+    ax[2].set_title('Pressure error', fontsize=14)
+    ax[2].tick_params(axis='both', which='major', labelsize=12)
+    ax[2].legend(fontsize=12)
+
+    plt.tight_layout()
+
+    return fig, ax
+
+
 def create_animation(x_vec, U_exact, U_numerical, U_nn):
 
     matplotlib.rcParams['animation.embed_limit'] = 2**28
@@ -189,17 +399,21 @@ def create_animation(x_vec, U_exact, U_numerical, U_nn):
     fig, ax = plt.subplots(1, 3, figsize=(12, 4.5))
     [ax[i].set_box_aspect(1) for i in range(3)]
 
-    ax[0].set_xlabel('x')
-    ax[1].set_xlabel('x')
-    ax[2].set_xlabel('x')
+    ax[0].set_xlabel('x', fontsize=14)
+    ax[1].set_xlabel('x', fontsize=14)
+    ax[2].set_xlabel('x', fontsize=14)
 
-    ax[0].set_ylabel(r'$\rho$')
-    ax[1].set_ylabel(r'$u$')
-    ax[2].set_ylabel(r'$p$')
+    ax[0].set_ylabel(r'$\rho$', fontsize=14)
+    ax[1].set_ylabel(r'$u$', fontsize=14)
+    ax[2].set_ylabel(r'$p$', fontsize=14)
 
-    ax[0].set_title('Density')
-    ax[1].set_title('Flow speed')
-    ax[2].set_title('Pressure')
+    ax[0].set_title('Density', fontsize=14)
+    ax[1].set_title('Flow speed', fontsize=14)
+    ax[2].set_title('Pressure', fontsize=14)
+
+    ax[0].tick_params(axis='both', which='major', labelsize=12)
+    ax[1].tick_params(axis='both', which='major', labelsize=12)
+    ax[2].tick_params(axis='both', which='major', labelsize=12)
 
     # Exact solution
     rho_ex, u_ex, p_ex = [np.array(U_exact[i, :]) for i in range(3)]
@@ -296,7 +510,9 @@ if __name__ == '__main__':
             v['model_metadata']['n_epochs'] == 50000):
 
             filt_dict_1[k] = v
-    fig, ax = generate_plot(filt_dict_1)
+
+
+    # fig, ax = generate_comparative_plot(filt_dict_1)
 
 
 
