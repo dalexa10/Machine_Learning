@@ -22,11 +22,11 @@ for i, iter in enumerate(iter_ls):
                      'hidden': iter[3],
                      'activation': iter[4],
                      'lr': iter[5],
-                     'n_epochs': 50000,
+                     'n_epochs': 1000,
                      'sampling_mode': 'uniform',
                      't_points': 1000,
                      'x_points': 1000,
-                     'percent_int_points': 15,
+                     'percent_int_points': 10,
                      'bc_points': 1000
                      }
 
