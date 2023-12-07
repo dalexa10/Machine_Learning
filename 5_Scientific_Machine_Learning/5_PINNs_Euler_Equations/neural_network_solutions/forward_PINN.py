@@ -235,11 +235,17 @@ def train_NN_Euler_equations(config_dict):
     # Set optimizer
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_history = []
+    loss_PDE_ls = []
+    loss_IC_ls = []
 
     for i in range(n_epochs):
 
         loss_IC = initial_condition_loss_function(model, tx_ic_train, rho_ic_train, u_ic_train, p_ic_train)
+        loss_IC_ls.append(loss_IC.item())
+
         loss_PDE = pde_loss_function(model, tx_int_train)
+        loss_PDE_ls.append(loss_PDE.item())
+
         loss = w_ic * loss_IC + w_pde * loss_PDE
 
         opt.zero_grad()
@@ -274,6 +280,7 @@ def train_NN_Euler_equations(config_dict):
     metadata_dict['ext_domain_activated'] = ext_domain_str
     metadata_dict['weights_activated'] = weights_str
     metadata_dict['time'] = end_time - start_time
+    metadata_dict['time_per_step'] = metadata_dict['time'] / metadata_dict['n_epochs']
 
     # Store model metadata in json
     json_data = json.dumps(metadata_dict, indent=2)
@@ -290,6 +297,18 @@ def train_NN_Euler_equations(config_dict):
 
     with open(os.path.join(case_path, file_name_loss_hist), 'wb') as f:
         pickle.dump(loss_history, f)
+
+    # Store IC loss history
+    file_name_loss_IC = 'loss_IC.pkl'
+
+    with open(os.path.join(case_path, file_name_loss_IC), 'wb') as f:
+        pickle.dump(loss_IC_ls, f)
+
+    # Store PDE loss history
+    file_name_loss_PDE = 'loss_PDE.pkl'
+
+    with open(os.path.join(case_path, file_name_loss_PDE), 'wb') as f:
+        pickle.dump(loss_PDE_ls, f)
 
     # Store model state
     torch.save(model.state_dict(), os.path.join(case_path, 'model.pth'))
@@ -311,23 +330,14 @@ if __name__ == '__main__':
 
     # --------------------------------------------------------
     #               Multiprocessing trainning
+    # Note: all the cases in the 'cases_dict' dictionary will be
+    # run either in parallel or serial depending on your choice
+    # below
     # --------------------------------------------------------
 
     import multiprocessing
 
     cases_dict = {0: {'domain': [0, 1],   # [x_lb, x_ub]
-                      'weights': [1, 1],
-                      'width': 30,
-                      'hidden': 7,
-                      'n_epochs': 80000,
-                      'lr': 0.0005,
-                      'activation': 'tanh',
-                      'sampling_mode': 'uniform',
-                      't_points': 1000,
-                      'x_points': 1000,
-                      'percent_int_points': 11,
-                      'bc_points': 1000},
-                  1: {'domain': [0, 1],  # [x_lb, x_ub]
                       'weights': [1, 1],
                       'width': 30,
                       'hidden': 7,
@@ -337,44 +347,77 @@ if __name__ == '__main__':
                       'sampling_mode': 'uniform',
                       't_points': 1000,
                       'x_points': 1000,
-                      'percent_int_points': 11,
+                      'percent_int_points': 15,
+                      'bc_points': 1000},
+                  1: {'domain': [-1.5, 3.125],  # [x_lb, x_ub]
+                      'weights': [1, 1],
+                      'width': 30,
+                      'hidden': 7,
+                      'n_epochs': 100000,
+                      'lr': 0.0005,
+                      'activation': 'tanh',
+                      'sampling_mode': 'uniform',
+                      't_points': 1000,
+                      'x_points': 1000,
+                      'percent_int_points': 15,
                       'bc_points': 1000},
                   2: {'domain': [0, 1],  # [x_lb, x_ub]
-                      'weights': [1, 1],
+                      'weights': [0.1, 10],
                       'width': 30,
                       'hidden': 7,
-                      'n_epochs': 80000,
+                      'n_epochs': 100000,
                       'lr': 0.0005,
                       'activation': 'tanh',
                       'sampling_mode': 'uniform',
                       't_points': 1000,
                       'x_points': 1000,
-                      'percent_int_points': 20,
+                      'percent_int_points': 15,
                       'bc_points': 1000},
-                  3: {'domain': [0, 1],  # [x_lb, x_ub]
-                      'weights': [1, 1],
+                  3: {'domain': [-1.5, 3.125],  # [x_lb, x_ub]
+                      'weights': [0.1, 10],
                       'width': 30,
                       'hidden': 7,
-                      'n_epochs': 80000,
+                      'n_epochs': 100000,
                       'lr': 0.0005,
                       'activation': 'tanh',
                       'sampling_mode': 'uniform',
                       't_points': 1000,
                       'x_points': 1000,
-                      'percent_int_points': 30,
+                      'percent_int_points': 15,
                       'bc_points': 1000}
                   }
 
-    # Serialize the training
-    for case in cases_dict.values():
-        train_NN_Euler_equations(case)
+    # ---------------------------------------------------------
+    #               SERIAL TRAINING SECTION
+    # ---------------------------------------------------------
 
-    # # Parallelize the training
-    # with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-    #     pool.map(train_NN_Euler_equations, cases_dict.values())
+    # # Serialize the training
+    # for case in cases_dict.values():
+    #     train_NN_Euler_equations(case)
+
+    # ---------------------------------------------------------
+    #               PARALLEL TRAINING SECTION
+    # ---------------------------------------------------------
+    # Note: uncomment the code below if you have a CUDA device installed
+    # in your system that is able to run PyTorch with in GPU
+
+    # Parallelize the training
+    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+        pool.map(train_NN_Euler_equations, cases_dict.values())
+
 
     # --------------------------------------------------------
     #                Single case running
+
+    # Note: Uncomment the section below if you want to train
+    # a single model. The code internally will determine if you
+    # have a GPU device available. If so, it'll run the code
+    # using GPUs. Otherwise, i'll train the model using CPU
+
+    # The aforementioned does not have anything to do with
+    # running multiple cases in parallel as explained in the
+    # first section
+
     # --------------------------------------------------------
     # case_dict = {'domain': [0, 1],   # [x_lb, x_ub]
     #              'weights': [1, 1],  # [wpde, wic]
