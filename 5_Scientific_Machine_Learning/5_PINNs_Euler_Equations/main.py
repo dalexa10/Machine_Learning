@@ -2,6 +2,7 @@ __author__ = 'Dario Rodriguez'
 
 import numpy as np
 import torch
+import time
 from numerical_solution import solve_Euler_PDE_WENO
 from analytic_solutions import SodShockAnalytic
 from aux_functions import (load_single_trained_model, load_all_trained_models,
@@ -25,17 +26,25 @@ x_vec = np.linspace(0, 1, nx)
 # this function and is needed for the analytic and neural network solutions
 # for a proper comparison
 
+time_num_start = time.time()
+
 x_weno, U_final_weno, data_weno = solve_Euler_PDE_WENO(nx, T)
 t_vec = data_weno['t']
 rho_num, u_num, p_num = data_weno['rho'], data_weno['u'], data_weno['p']
 U_num = np.array([rho_num, u_num, p_num])
 
+time_num_end = time.time()
+
+print('Time to compute the numerical solution: {:.2f} seconds'.format(time_num_end - time_num_start))
 
 # -----------------------------------------------
 #              Analytic solution
 # -----------------------------------------------
 x_exact = x_vec.copy()
 rho_exact, u_exact, p_exact = [], [], []
+
+time_exact_start = time.time()
+
 for t in t_vec:
     u_exact_i = SodShockAnalytic(x_exact, t)
     rho_exact.append(u_exact_i[0, :])
@@ -44,6 +53,9 @@ for t in t_vec:
 U_exact = np.array([rho_exact, u_exact, p_exact])
 U_exact_final = U_exact[:, -1, :]
 
+time_exact_end = time.time()
+
+print('Time to compute the analytic solution: {:.2f} seconds'.format(time_exact_end - time_exact_start))
 
 # -----------------------------------------------
 #             Neural network solution
@@ -65,7 +77,13 @@ nn_model_C1, metadata_C1, loss_C1 = (model_dict_C1[0]['model'], model_dict_C1[0]
 # Comparative plot at T = 0.2
 T = 0.2
 x_nn = torch.linspace(0, 1, nx)[:, None].to(device)
+
+time_eval_nn_start = time.time()
 model_dict_C1 = eval_nn_model(model_dict_C1, x_nn, T, device='cpu')
+time_eval_nn_end = time.time()
+
+print('Time to evaluate the neural network solution: {:.2f} seconds'.format(time_eval_nn_end - time_eval_nn_start))
+
 fig_c1_0, ax_c1_0 = generate_comparative_plot(x_nn, model_dict_C1, x_exact, U_exact_final, x_weno, U_final_weno,
                                     custom_title=None, custom_legend=[''], legend_loss=True)
 
